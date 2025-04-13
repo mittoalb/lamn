@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.env/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+
+lamn/agents.json
+
