@@ -57,8 +57,6 @@ lamn is a lightweight, Python-based tool for monitoring system performance acros
   lamn server stop
   lamn client stop
   ```
-  Once you create and save the file, it's ready to be committed to your repository.
-
 
 
 ## Installation
