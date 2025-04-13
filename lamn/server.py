@@ -5,21 +5,22 @@ from lamn.config import load_agents
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, template_folder="templates")
+import os
+template_dir = os.path.join(os.path.dirname(__file__), "templates")
+app = Flask(__name__, template_folder=template_dir)
+
+metrics_data = {}
 
 def get_agent_ips():
     return load_agents()
-
-metrics_data = {}
 
 def poll_agent(ip):
     try:
         response = requests.get(f'http://{ip}:5000/metrics', timeout=2)
         metrics_data[ip] = response.json()
-        logger.debug(f"Polled {ip} successfully")
-    except Exception as e:
-        metrics_data[ip] = {"error": str(e)}
-        logger.error(f"Error polling {ip}: {e}")
+    except Exception:
+        metrics_data[ip] = {"error": "Client not running/not reachable"}
+        logger.error(f"Error polling {ip}: Client not running/not reachable")
 
 def polling_loop():
     while True:
@@ -45,7 +46,7 @@ def metrics():
 
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
-    logger.info("Server shutdown endpoint called")
+    logger.info("Shutdown endpoint called")
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
@@ -56,3 +57,5 @@ def start():
     logger.info("Starting server on port 8000")
     app.run(host='0.0.0.0', port=8000)
 
+if __name__ == '__main__':
+    start()
