@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tomo Cluster System Monitor Dashboard</title>
+  <style>
+    /* Overall page styles */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #eef2f7;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background-color: #3498db;
+      padding: 20px;
+      text-align: center;
+      color: #fff;
+    }
+    .container {
+      width: 90%;
+      max-width: 1000px;
+      margin: 30px auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead {
+      background-color: #2c3e50;
+      color: #fff;
+    }
+    th, td {
+      padding: 12px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+    tbody tr:hover {
+      background-color: #f1f1f1;
+    }
+    .error {
+      color: red;
+      font-weight: bold;
+    }
+    .status-ok {
+      color: green;
+      font-weight: bold;
+    }
+    /* Hidden details row */
+    .details-row {
+      background-color: #f9f9f9;
+      display: none;
+    }
+    .details-cell {
+      text-align: left;
+      font-size: 0.9em;
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    button.toggle-details {
+      cursor: pointer;
+      padding: 5px 10px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TOMO Cluster System Monitor Dashboard</h1>
+  </header>
+  <div class="container">
+    <table>
+      <thead>
+        <tr>
+          <th>Host</th>
+          <th>CPU (%)</th>
+          <th>Memory (%)</th>
+          <th>Disk Read</th>
+          <th>Disk Write</th>
+          <th>GPU (%)</th>
+          <th>Timestamp</th>
+          <th>Status</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody id="metricsTable">
+        <!-- Rows injected via JavaScript -->
+      </tbody>
+    </table>
+  </div>
+  
+  <script>
+    // Helper: Convert bytes into a human-readable string.
+    function formatBytes(bytes, decimals = 2) {
+      if (bytes === 0 || bytes === null) return '0 Bytes';
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    // Toggle the details row.
+    function toggleDetails(rowId) {
+      const detailsRow = document.getElementById(rowId);
+      detailsRow.style.display = (detailsRow.style.display === "table-row") ? "none" : "table-row";
+    }
+
+    // Build HTML content for hardware specs (including OS info).
+    function buildSpecsHTML(specs) {
+      if (!specs) return "No specs available.";
+      let html = "";
+      html += `<strong>CPU Model:</strong> ${specs.cpu}<br>`;
+      html += `<strong>GPU Name:</strong> ${specs.gpu}<br>`;
+      html += `<strong>Total RAM:</strong> ${formatBytes(specs.ram)}<br>`;
+      if (specs.os) {
+        html += `<strong>OS:</strong> ${specs.os.system} ${specs.os.release} (${specs.os.version})<br>`;
+      }
+      if (specs.disks && specs.disks.length) {
+        html += `<strong>Disks:</strong><br>`;
+        specs.disks.forEach(disk => {
+          html += `&nbsp;&nbsp;Device: ${disk.device}, Mount: ${disk.mountpoint}, Total: ${formatBytes(disk.total)}<br>`;
+        });
+      }
+      if (specs.connectivity) {
+        html += `<strong>Connectivity:</strong><br>`;
+        for (let iface in specs.connectivity) {
+          html += `&nbsp;&nbsp;${iface}: ${specs.connectivity[iface].join(", ")}<br>`;
+        }
+      }
+      return html;
+    }
+
+    async function fetchMetrics() {
+      try {
+        const response = await fetch('/metrics');
+        const data = await response.json();
+        const tableBody = document.getElementById("metricsTable");
+        tableBody.innerHTML = ""; // Clear current rows
+
+        for (let ip in data) {
+          const entry = data[ip];
+          // Create a safe HTML id by replacing dots.
+          const safeId = ip.replace(/\./g, "_");
+          let row = "<tr>";
+          
+          if (entry.error) {
+            row += `<td>${ip}</td>`;
+            row += `<td colspan="7" class="error">Error: ${entry.error}</td>`;
+            row += `<td class="error">❌</td>`;
+            row += `<td></td>`;
+          } else {
+            let hostLabel = entry.host || ip;
+            row += `<td>${hostLabel} (${ip})</td>`;
+            row += `<td>${entry.cpu !== undefined ? entry.cpu : 'N/A'}</td>`;
+            row += `<td>${entry.memory !== undefined ? entry.memory : 'N/A'}</td>`;
+            row += `<td>${entry.disk_read_bytes !== undefined ? formatBytes(entry.disk_read_bytes) : 'N/A'}</td>`;
+            row += `<td>${entry.disk_write_bytes !== undefined ? formatBytes(entry.disk_write_bytes) : 'N/A'}</td>`;
+            row += `<td>${entry.gpu !== null && entry.gpu !== undefined ? entry.gpu : 'N/A'}</td>`;
+            row += `<td>${entry.timestamp || 'N/A'}</td>`;
+            row += `<td class="status-ok">✅</td>`;
+            row += `<td><button class="toggle-details" onclick="toggleDetails('details_${safeId}')">Details</button></td>`;
+          }
+          row += "</tr>";
+
+          // Details row: hidden by default.
+          let detailsRow = `<tr id="details_${safeId}" class="details-row"><td class="details-cell" colspan="9">`;
+          detailsRow += entry.specs ? buildSpecsHTML(entry.specs) : "No hardware specs available.";
+          detailsRow += "</td></tr>";
+
+          tableBody.innerHTML += row + detailsRow;
+        }
+      } catch (error) {
+        console.error("Error fetching metrics:", error);
+      }
+    }
+
+    // Refresh the dashboard every 5 seconds.
+    setInterval(fetchMetrics, 5000);
+    fetchMetrics();
+  </script>
+</body>
+</html>
+
