@@ -8,3 +8,4 @@ License-File: LICENSE
 Requires-Dist: Flask
 Requires-Dist: psutil
 Requires-Dist: requests
+Requires-Dist: py-cpuinfo

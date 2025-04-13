@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tomo Cluster System Monitor Dashboard</title>
+  <title>LAN System Monitor Dashboard</title>
   <style>
     /* Overall page styles */
     body {
@@ -51,7 +51,7 @@
       color: green;
       font-weight: bold;
     }
-    /* Hidden details row */
+    /* Hidden details row styling */
     .details-row {
       background-color: #f9f9f9;
       display: none;
@@ -71,7 +71,7 @@
 </head>
 <body>
   <header>
-    <h1>TOMO Cluster System Monitor Dashboard</h1>
+    <h1>LAN System Monitor Dashboard</h1>
   </header>
   <div class="container">
     <table>
@@ -89,13 +89,13 @@
         </tr>
       </thead>
       <tbody id="metricsTable">
-        <!-- Rows injected via JavaScript -->
+        <!-- Table rows will be injected via JavaScript -->
       </tbody>
     </table>
   </div>
   
   <script>
-    // Helper: Convert bytes into a human-readable string.
+    // Helper: convert bytes into a human-readable string.
     function formatBytes(bytes, decimals = 2) {
       if (bytes === 0 || bytes === null) return '0 Bytes';
       const k = 1024;
@@ -111,7 +111,7 @@
       detailsRow.style.display = (detailsRow.style.display === "table-row") ? "none" : "table-row";
     }
 
-    // Build HTML content for hardware specs (including OS info).
+    // Build HTML content for hardware specs, including OS and connectivity speeds.
     function buildSpecsHTML(specs) {
       if (!specs) return "No specs available.";
       let html = "";
@@ -130,7 +130,10 @@
       if (specs.connectivity) {
         html += `<strong>Connectivity:</strong><br>`;
         for (let iface in specs.connectivity) {
-          html += `&nbsp;&nbsp;${iface}: ${specs.connectivity[iface].join(", ")}<br>`;
+          let item = specs.connectivity[iface];
+          // If speed is defined and reasonable, display it; otherwise "N/A".
+          let speedDisplay = (item.speed && item.speed > 0 && item.speed < 65535) ? item.speed + " Mbps" : "N/A";
+          html += `&nbsp;&nbsp;${iface}: ${item.addresses.join(", ")} (Speed: ${speedDisplay})<br>`;
         }
       }
       return html;
@@ -141,14 +144,14 @@
         const response = await fetch('/metrics');
         const data = await response.json();
         const tableBody = document.getElementById("metricsTable");
-        tableBody.innerHTML = ""; // Clear current rows
+        tableBody.innerHTML = ""; // Clear existing rows
 
+        // Build table rows.
         for (let ip in data) {
           const entry = data[ip];
-          // Create a safe HTML id by replacing dots.
+          // Create a safe HTML id by replacing dots with underscores.
           const safeId = ip.replace(/\./g, "_");
           let row = "<tr>";
-          
           if (entry.error) {
             row += `<td>${ip}</td>`;
             row += `<td colspan="7" class="error">Error: ${entry.error}</td>`;
@@ -168,7 +171,7 @@
           }
           row += "</tr>";
 
-          // Details row: hidden by default.
+          // Build the hidden details row.
           let detailsRow = `<tr id="details_${safeId}" class="details-row"><td class="details-cell" colspan="9">`;
           detailsRow += entry.specs ? buildSpecsHTML(entry.specs) : "No hardware specs available.";
           detailsRow += "</td></tr>";
@@ -186,4 +189,3 @@
   </script>
 </body>
 </html>
-

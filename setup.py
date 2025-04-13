@@ -8,7 +8,8 @@ setup(
     install_requires=[
         "Flask",
         "psutil",
-        "requests"
+        "requests",
+        "py-cpuinfo"
     ],
     include_package_data=True,
     package_data={"lamn": ["templates/*.html"]},

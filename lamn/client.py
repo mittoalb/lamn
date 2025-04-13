@@ -1,6 +1,6 @@
+# lamn/client.py
 from flask import Flask, jsonify, request
-import psutil, datetime, subprocess, socket, platform, logging
-import os
+import psutil, datetime, subprocess, socket, platform, logging, os
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -9,12 +9,18 @@ app = Flask(__name__)
 
 def get_specs():
     """
-    Collect additional hardware specifications including OS details.
+    Collect additional hardware specifications including detailed CPU model,
+    network interface speed (filtered), OS details, and more.
     """
-    # CPU information
-    cpu_info = platform.processor() or "Unknown CPU"
-
-    # GPU information - try to get the GPU name using nvidia-smi
+    # CPU: get detailed model using py-cpuinfo if available.
+    try:
+        import cpuinfo
+        cpu_info_full = cpuinfo.get_cpu_info()
+        cpu_model = cpu_info_full.get('brand_raw', 'Unknown CPU')
+    except ImportError:
+        cpu_model = platform.processor() or "Unknown CPU"
+    
+    # GPU: try to get the GPU name using nvidia-smi.
     try:
         gpu_output = subprocess.check_output(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
@@ -26,10 +32,10 @@ def get_specs():
         logger.error("Error fetching GPU info: " + str(e))
         gpu_info = "No GPU"
     
-    # Total RAM (in bytes)
+    # Total RAM in bytes.
     ram_total = psutil.virtual_memory().total
     
-    # Disk specifications: list each disk's device, mount point, and total capacity.
+    # Disk specifications: list disks with device, mountpoint, and total capacity.
     disks = psutil.disk_partitions()
     disk_specs = []
     for disk in disks:
@@ -43,13 +49,24 @@ def get_specs():
         except Exception:
             continue
     
-    # Network connectivity: list IPv4 addresses per interface.
+    # Network connectivity: list IPv4 addresses and interface speed.
     nics = psutil.net_if_addrs()
+    nic_stats = psutil.net_if_stats()
     connectivity = {}
     for iface, addrs in nics.items():
-        connectivity[iface] = [addr.address for addr in addrs if addr.family == socket.AF_INET]
+        ipv4_addresses = [addr.address for addr in addrs if addr.family == socket.AF_INET]
+        speed = None
+        if iface in nic_stats:
+            # s is the reported speed in Mbps.
+            s = nic_stats[iface].speed
+            # Filter out unrealistic speeds: if s is 0 or >= 65535 then mark as None.
+            speed = s if s and s > 0 and s < 65535 else None
+        connectivity[iface] = {
+            "addresses": ipv4_addresses,
+            "speed": speed
+        }
     
-    # OS information
+    # OS information.
     os_info = {
          "system": platform.system(),
          "release": platform.release(),
@@ -58,7 +75,7 @@ def get_specs():
     }
     
     return {
-        "cpu": cpu_info,
+        "cpu": cpu_model,
         "gpu": gpu_info,
         "ram": ram_total,
         "disks": disk_specs,
@@ -68,7 +85,7 @@ def get_specs():
 
 def get_metrics():
     """
-    Collect dynamic performance metrics and include extra hardware specs.
+    Collect current performance metrics and include extra hardware specs.
     """
     host_name = socket.gethostname()
     cpu_usage = psutil.cpu_percent(interval=1)
@@ -79,7 +96,7 @@ def get_metrics():
     disk_read = disk_counters.read_bytes if disk_counters else None
     disk_write = disk_counters.write_bytes if disk_counters else None
 
-    # GPU usage: try to get utilization for NVIDIA GPUs.
+    # GPU utilization: try to get the percentage utilization for NVIDIA GPUs.
     gpu_usage = None
     try:
         gpu_output = subprocess.check_output(
@@ -124,4 +141,3 @@ def start():
 
 if __name__ == '__main__':
     start()
-
