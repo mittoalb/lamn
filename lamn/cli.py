@@ -66,6 +66,11 @@ def main():
     # Terminal command: display central server metrics in terminal.
     terminal_parser = subparsers.add_parser('terminal', help='Display central server metrics in the terminal')
     terminal_parser.add_argument('--url', default='http://127.0.0.1:8000/metrics', help='Central server metrics URL')
+    
+    # Add command to remove an agent IP address.
+    remove_parser = subparsers.add_parser('remove', help='Remove an agent IP address from monitoring')
+    remove_parser.add_argument('ip_address', help='IP address of the agent to remove')
+
 
     args = parser.parse_args()
 

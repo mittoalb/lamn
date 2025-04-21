@@ -22,4 +22,13 @@ def add_agent(ip):
         save_agents(agents)
         return True
     return False
+    
+def remove_agent(ip):
+    agents = load_agents()
+    if ip in agents:
+        agents.remove(ip)
+        save_agents(agents)
+        return True
+    return False
+    
 
