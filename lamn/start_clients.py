@@ -82,8 +82,7 @@ def start_client_on(ip, username, password, conda_env, screen_name, launch_cmd):
                 break
 
         # Send the remote script
-        child.sendline(remote_script)
-        child.sendline("exit")  # triggers execution and closes remote shell
+        child.send(remote_script.encode("utf-8") + b"\nexit\n")
         child.expect(pexpect.EOF)
         print(f"[{ip}] ✅ Launch command sent and connection closed")
 
