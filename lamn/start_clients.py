@@ -44,51 +44,51 @@ def load_agents():
 def start_client_on(ip, username, password, conda_env, screen_name, launch_cmd):
     print(f"[+] Connecting to {ip} to start client...")
 
+    # Launch the client inside screen; no output expected
     remote_script = f"""
         screen -dmS {screen_name} bash -c '
             source ~/.bashrc
             conda activate {conda_env}
             {launch_cmd}
         '
-        echo "Client launched OK"
     """
 
     ssh_cmd = f"ssh {username}@{ip} 'bash -s'"
     print(f"[DEBUG] SSH CMD: {ssh_cmd}")
 
     try:
-        child = pexpect.spawn(ssh_cmd, timeout=30)
-        child.logfile = sys.stdout  # Optional: print everything for debugging
+        child = pexpect.spawn(ssh_cmd, timeout=20)
+        child.logfile = sys.stdout.buffer  # DEBUG output
 
         while True:
             i = child.expect([
                 "Are you sure you want to continue connecting",  # 0
                 "password:",                                     # 1
-                "Client launched OK",                            # 2
-                pexpect.EOF,                                     # 3
-                pexpect.TIMEOUT                                  # 4
+                pexpect.EOF,                                     # 2
+                pexpect.TIMEOUT                                  # 3
             ])
 
             if i == 0:
-                print(f"[{ip}] Trusting SSH key")
+                print(f"[{ip}] Accepting new host key")
                 child.sendline("yes")
             elif i == 1:
                 print(f"[{ip}] Sending password")
                 child.sendline(password)
             elif i == 2:
-                print(f"[{ip}] ✅ Client launched")
+                print(f"[{ip}] ✅ SSH completed (EOF)")
                 break
             elif i == 3:
-                print(f"[{ip}] ⚠️ Connection ended before confirmation")
-                break
-            elif i == 4:
-                print(f"[{ip}] ❌ SSH timed out")
+                print(f"[{ip}] ❌ Timeout")
                 break
 
-        child.close()
+        # Send the remote script
+        child.sendline(remote_script)
+        child.expect(pexpect.EOF)
+        print(f"[{ip}] ✅ Launch command sent and connection closed")
 
     except Exception as e:
         print(f"[X] Error on {ip}: {e}")
+
 
 
 
