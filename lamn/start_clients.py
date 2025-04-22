@@ -6,6 +6,7 @@ import textwrap
 import sys
 import getpass
 import pexpect
+import sys
 
 # --- Config paths ---
 CONFIG_FILE = os.path.expanduser("~/.lamn_config.json")
@@ -43,9 +44,6 @@ def load_agents():
 def start_client_on(ip, username, password, conda_env, screen_name, launch_cmd):
     print(f"[+] Connecting to {ip} to start client...")
 
-    ssh_cmd = f"ssh {username}@{ip} 'bash -s'"
-    print(f"[DEBUG] Running SSH command: {ssh_cmd}")
-
     remote_script = f"""
         screen -dmS {screen_name} bash -c '
             source ~/.bashrc
@@ -55,39 +53,43 @@ def start_client_on(ip, username, password, conda_env, screen_name, launch_cmd):
         echo "Client launched OK"
     """
 
+    ssh_cmd = f"ssh {username}@{ip} 'bash -s'"
+    print(f"[DEBUG] SSH CMD: {ssh_cmd}")
+
     try:
         child = pexpect.spawn(ssh_cmd, timeout=30)
+        child.logfile = sys.stdout  # Optional: print everything for debugging
 
-        i = child.expect([
-            "Are you sure you want to continue connecting",  # first-time trust prompt
-            "password:",
-            pexpect.EOF,
-            pexpect.TIMEOUT
-        ])
+        while True:
+            i = child.expect([
+                "Are you sure you want to continue connecting",  # 0
+                "password:",                                     # 1
+                "Client launched OK",                            # 2
+                pexpect.EOF,                                     # 3
+                pexpect.TIMEOUT                                  # 4
+            ])
 
-        if i == 0:
-            print(f"[{ip}] Accepting new host key")
-            child.sendline("yes")
-            child.expect("password:")
-            child.sendline(password)
-        elif i == 1:
-            print(f"[{ip}] Sending password")
-            child.sendline(password)
-        elif i in [2, 3]:
-            raise RuntimeError(f"[{ip}] SSH connection failed (EOF or TIMEOUT)")
+            if i == 0:
+                print(f"[{ip}] Trusting SSH key")
+                child.sendline("yes")
+            elif i == 1:
+                print(f"[{ip}] Sending password")
+                child.sendline(password)
+            elif i == 2:
+                print(f"[{ip}] ✅ Client launched")
+                break
+            elif i == 3:
+                print(f"[{ip}] ⚠️ Connection ended before confirmation")
+                break
+            elif i == 4:
+                print(f"[{ip}] ❌ SSH timed out")
+                break
 
-        # Send the remote script
-        child.sendline(remote_script)
-        child.expect(pexpect.EOF)
-
-        output = child.before.decode(errors="ignore").strip()
-        print(f"[{ip}] Remote output:\n{output}")
-
-        if "Client launched OK" not in output:
-            raise RuntimeError(f"[{ip}] Client may not have launched correctly.")
+        child.close()
 
     except Exception as e:
-        print(f"[X] Error starting client on {ip}: {e}")
+        print(f"[X] Error on {ip}: {e}")
+
 
 
 def main():
