@@ -1,68 +1,82 @@
-# lamn - LAN Monitoring Tool
+# lamn-client-launcher
 
-lamn is a lightweight, Python-based tool for monitoring system performance across a Local Area Network (LAN). It aggregates metrics such as CPU usage, memory usage, disk I/O, and GPU utilization from multiple machines using a simple HTTP-based agent and presents the data in a web-accessible dashboard.
+A minimal command-line tool to launch `lamn` clients on multiple remote agents via SSH using `screen` and `conda`. Configuration is handled via JSON files in your home directory.
 
-
+---
 
 ## Features
 
-- **Agent and Server Architecture**  
-  Deploy a client (agent) on each machine to report metrics, and aggregate the data on a central server.
-  
-- **Real-Time Monitoring**  
-  View live updates of performance data, including CPU, memory, disk I/O, and GPU usage.
+- Launches `lamn` clients remotely via `ssh`
+- Uses `screen` to ensure background execution
+- Reads global configuration from `~/.lamn_config.json`
+- Loads agent IPs from `~/.agents.json`
+- Automatically creates config files if missing
+- Validates required config fields on startup
 
-- **Expandable Hardware Specs**  
-  Click on a monitored host’s details to reveal additional hardware information such as OS details, CPU model, GPU name, total RAM, disk capacity, and network connectivity.
+---
 
-- **Command-Line Interface (CLI)**  
-  Use simple commands to start/stop services and add new agents:
-  ```bash
-  lamn server start
-  lamn client start
-  lamn server stop
-  lamn client stop
-  lamn add <IP address>
+## Configuration
 
+### `~/.lamn_config.json` (required)
+
+Stores global defaults used for all agents:
+
+```json
+{
+  "conda_env": "python_servers",
+  "screen_name": "lamn_client",
+  "launch_cmd": "python ~/Software/lamn/lamn/cli.py client start"
+}
+```
+
+If this file does not exist, it will be auto-created as an empty `{}` and the script will exit with an instruction to edit it.
+
+### `~/.agents.json`
+
+A list of IPs to connect to. The SSH username is passed as an argument to the script:
+
+```json
+[
+  "192.168.1.100",
+  "192.168.1.101"
+]
+```
+
+---
 
 ## Usage
 
-  Start the Central Server
-  Run the following command on the machine designated as the central server:
-  ```bash
-  lamn server start
-  ```
+```bash
+python start_clients.py --username <ssh_username>
+```
 
-  The server runs on port 8000 by default. Open your browser and navigate to http://<server-ip>:8000 to view the dashboard.
+This will:
 
-  Start a Client (Agent)
-  On each machine you wish to monitor, run:
+- Read the config from `~/.lamn_config.json`
+- Load agent IPs from `~/.agents.json`
+- SSH into each machine and:
+  - Check if a `screen` session with the given name is already running
+  - If not, activate the conda environment and start the client in a new screen
 
-  ```bash
-  lamn client start
-  ```
-  
-  The client runs on port 5000 by default and serves its metrics at /metrics.
+---
 
-  Add an Agent
-  To add an agent IP for monitoring:
+## Requirements
 
-  ```bash
-  lamn add <IP address>
-  ```
-  Stop Services
-  Stop the server or client using:
+- Python 3.6+
+- `ssh` access to each remote host
+- `screen` installed on each remote host
+- `conda` installed and properly configured via `.bashrc` on each host
 
-  ```bash
-  lamn server stop
-  lamn client stop
-  ```
-  Once you create and save the file, it's ready to be committed to your repository.
+---
+
+## 📎 Example Output
+
+```
+[+] Connecting to 192.168.1.100 to start client...
+[!] Client already running on 192.168.1.100 (screen lamn_client)
+
+[+] Connecting to 192.168.1.101 to start client...
+[+] Starting client on 192.168.1.101...
+```
 
 
-
-## Installation
-  ```bash
-  git clone https://github.com/YourUserName/lamn.git
-  cd lamn
-  pip install -e .
