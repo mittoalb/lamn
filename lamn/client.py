@@ -11,6 +11,7 @@ def get_specs():
     """
     Collect additional hardware specifications including detailed CPU model,
     network interface speed (filtered), OS details, and more.
+    Includes summary of total disk space usage and free space.
     """
     # CPU: get detailed model using py-cpuinfo if available.
     try:
@@ -19,7 +20,7 @@ def get_specs():
         cpu_model = cpu_info_full.get('brand_raw', 'Unknown CPU')
     except ImportError:
         cpu_model = platform.processor() or "Unknown CPU"
-    
+
     # GPU: try to get the GPU name using nvidia-smi.
     try:
         gpu_output = subprocess.check_output(
@@ -31,24 +32,53 @@ def get_specs():
     except Exception as e:
         logger.error("Error fetching GPU info: " + str(e))
         gpu_info = "No GPU"
-    
+
     # Total RAM in bytes.
     ram_total = psutil.virtual_memory().total
-    
-    # Disk specifications: list disks with device, mountpoint, and total capacity.
+
+    # Disk specifications: list disks with device, mountpoint, total capacity, and free space.
     disks = psutil.disk_partitions()
     disk_specs = []
+    total_space = 0
+    total_used = 0
+    total_free = 0
+
     for disk in disks:
         try:
             usage = psutil.disk_usage(disk.mountpoint)
             disk_specs.append({
                 "device": disk.device,
                 "mountpoint": disk.mountpoint,
-                "total": usage.total
+                "total": usage.total,
+                "used": usage.used,
+                "free": usage.free,
+                "percent_used": usage.percent
             })
+            total_space += usage.total
+            total_used += usage.used
+            total_free += usage.free
         except Exception:
             continue
-    
+
+    # Convert bytes to human-readable format
+    def format_bytes(bytes_val):
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if bytes_val < 1024:
+                return f"{bytes_val:.2f} {unit}"
+            bytes_val /= 1024
+        return f"{bytes_val:.2f} PB"
+
+    # Overall disk usage summary
+    disk_summary = {
+        "total_space": total_space,
+        "total_used": total_used,
+        "total_free": total_free,
+        "percent_used": round(100 * total_used / total_space, 2) if total_space > 0 else None,
+        "total_space_human": format_bytes(total_space),
+        "total_used_human": format_bytes(total_used),
+        "total_free_human": format_bytes(total_free)
+    }
+
     # Network connectivity: list IPv4 addresses and interface speed.
     nics = psutil.net_if_addrs()
     nic_stats = psutil.net_if_stats()
@@ -57,31 +87,31 @@ def get_specs():
         ipv4_addresses = [addr.address for addr in addrs if addr.family == socket.AF_INET]
         speed = None
         if iface in nic_stats:
-            # s is the reported speed in Mbps.
             s = nic_stats[iface].speed
-            # Filter out unrealistic speeds: if s is 0 or >= 65535 then mark as None.
             speed = s if s and s > 0 and s < 65535 else None
         connectivity[iface] = {
             "addresses": ipv4_addresses,
             "speed": speed
         }
-    
+
     # OS information.
     os_info = {
-         "system": platform.system(),
-         "release": platform.release(),
-         "version": platform.version(),
-         "platform": platform.platform()
+        "system": platform.system(),
+        "release": platform.release(),
+        "version": platform.version(),
+        "platform": platform.platform()
     }
-    
+
     return {
         "cpu": cpu_model,
         "gpu": gpu_info,
         "ram": ram_total,
         "disks": disk_specs,
+        "disk_summary": disk_summary,
         "connectivity": connectivity,
         "os": os_info
     }
+
 
 def get_metrics():
     """

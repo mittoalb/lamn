@@ -1,15 +1,14 @@
-# lamn/config.py
-import json
 import os
+import json
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'agents.json')
+CONFIG_PATH = os.path.expanduser("~/.agents.json")  # Global per-user config file
 
 def load_agents():
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, 'r') as f:
-            return json.load(f)
-    else:
-        return []
+    if not os.path.exists(CONFIG_PATH):
+        # Ensure the file exists and is initialized as an empty list
+        save_agents([])
+    with open(CONFIG_PATH, 'r') as f:
+        return json.load(f)
 
 def save_agents(agents):
     with open(CONFIG_PATH, 'w') as f:
@@ -22,7 +21,7 @@ def add_agent(ip):
         save_agents(agents)
         return True
     return False
-    
+
 def remove_agent(ip):
     agents = load_agents()
     if ip in agents:
@@ -30,5 +29,3 @@ def remove_agent(ip):
         save_agents(agents)
         return True
     return False
-    
-

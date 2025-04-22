@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LAN System Monitor Dashboard</title>
   <style>
-    /* Overall page styles */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #eef2f7;
@@ -51,7 +50,6 @@
       color: green;
       font-weight: bold;
     }
-    /* Hidden details row styling */
     .details-row {
       background-color: #f9f9f9;
       display: none;
@@ -83,6 +81,7 @@
           <th>Disk Read</th>
           <th>Disk Write</th>
           <th>GPU (%)</th>
+          <th>Available Space</th>
           <th>Timestamp</th>
           <th>Status</th>
           <th>Details</th>
@@ -93,9 +92,8 @@
       </tbody>
     </table>
   </div>
-  
+
   <script>
-    // Helper: convert bytes into a human-readable string.
     function formatBytes(bytes, decimals = 2) {
       if (bytes === 0 || bytes === null) return '0 Bytes';
       const k = 1024;
@@ -105,37 +103,46 @@
       return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
     }
 
-    // Toggle the details row.
     function toggleDetails(rowId) {
       const detailsRow = document.getElementById(rowId);
       detailsRow.style.display = (detailsRow.style.display === "table-row") ? "none" : "table-row";
     }
 
-    // Build HTML content for hardware specs, including OS and connectivity speeds.
     function buildSpecsHTML(specs) {
       if (!specs) return "No specs available.";
       let html = "";
       html += `<strong>CPU Model:</strong> ${specs.cpu}<br>`;
       html += `<strong>GPU Name:</strong> ${specs.gpu}<br>`;
       html += `<strong>Total RAM:</strong> ${formatBytes(specs.ram)}<br>`;
+
       if (specs.os) {
         html += `<strong>OS:</strong> ${specs.os.system} ${specs.os.release} (${specs.os.version})<br>`;
       }
+
+      if (specs.disk_summary) {
+        html += `<strong>Disk Summary:</strong><br>`;
+        html += `&nbsp;&nbsp;Used: ${specs.disk_summary.total_used_human}<br>`;
+        html += `&nbsp;&nbsp;Free: ${specs.disk_summary.total_free_human}<br>`;
+        html += `&nbsp;&nbsp;Total: ${specs.disk_summary.total_space_human}<br>`;
+        html += `&nbsp;&nbsp;Occupancy: ${specs.disk_summary.percent_used}%<br>`;
+      }
+
       if (specs.disks && specs.disks.length) {
         html += `<strong>Disks:</strong><br>`;
         specs.disks.forEach(disk => {
-          html += `&nbsp;&nbsp;Device: ${disk.device}, Mount: ${disk.mountpoint}, Total: ${formatBytes(disk.total)}<br>`;
+          html += `&nbsp;&nbsp;Device: ${disk.device}, Mount: ${disk.mountpoint}, Total: ${formatBytes(disk.total)}, Used: ${formatBytes(disk.used)}, Free: ${formatBytes(disk.free)}<br>`;
         });
       }
+
       if (specs.connectivity) {
         html += `<strong>Connectivity:</strong><br>`;
         for (let iface in specs.connectivity) {
           let item = specs.connectivity[iface];
-          // If speed is defined and reasonable, display it; otherwise "N/A".
           let speedDisplay = (item.speed && item.speed > 0 && item.speed < 65535) ? item.speed + " Mbps" : "N/A";
           html += `&nbsp;&nbsp;${iface}: ${item.addresses.join(", ")} (Speed: ${speedDisplay})<br>`;
         }
       }
+
       return html;
     }
 
@@ -144,12 +151,10 @@
         const response = await fetch('/metrics');
         const data = await response.json();
         const tableBody = document.getElementById("metricsTable");
-        tableBody.innerHTML = ""; // Clear existing rows
+        tableBody.innerHTML = "";
 
-        // Build table rows.
         for (let ip in data) {
           const entry = data[ip];
-          // Create a safe HTML id by replacing dots with underscores.
           const safeId = ip.replace(/\./g, "_");
           let row = "<tr>";
           if (entry.error) {
@@ -158,21 +163,25 @@
             row += `<td class="error">❌</td>`;
             row += `<td></td>`;
           } else {
-            let hostLabel = entry.host || ip;
-            row += `<td>${hostLabel} (${ip})</td>`;
+            let rawHost = entry.host || ip;
+            let cleanHost = rawHost.split(".")[0];
+            const diskSummary = entry.specs?.disk_summary;
+            let spaceInfo = diskSummary ? `${diskSummary.total_free_human} / ${diskSummary.total_space_human}` : "N/A";
+
+            row += `<td>${cleanHost}</td>`;
             row += `<td>${entry.cpu !== undefined ? entry.cpu : 'N/A'}</td>`;
             row += `<td>${entry.memory !== undefined ? entry.memory : 'N/A'}</td>`;
             row += `<td>${entry.disk_read_bytes !== undefined ? formatBytes(entry.disk_read_bytes) : 'N/A'}</td>`;
             row += `<td>${entry.disk_write_bytes !== undefined ? formatBytes(entry.disk_write_bytes) : 'N/A'}</td>`;
             row += `<td>${entry.gpu !== null && entry.gpu !== undefined ? entry.gpu : 'N/A'}</td>`;
+            row += `<td>${spaceInfo}</td>`;
             row += `<td>${entry.timestamp || 'N/A'}</td>`;
             row += `<td class="status-ok">✅</td>`;
             row += `<td><button class="toggle-details" onclick="toggleDetails('details_${safeId}')">Details</button></td>`;
           }
           row += "</tr>";
 
-          // Build the hidden details row.
-          let detailsRow = `<tr id="details_${safeId}" class="details-row"><td class="details-cell" colspan="9">`;
+          let detailsRow = `<tr id="details_${safeId}" class="details-row"><td class="details-cell" colspan="10">`;
           detailsRow += entry.specs ? buildSpecsHTML(entry.specs) : "No hardware specs available.";
           detailsRow += "</td></tr>";
 
@@ -183,7 +192,6 @@
       }
     }
 
-    // Refresh the dashboard every 5 seconds.
     setInterval(fetchMetrics, 5000);
     fetchMetrics();
   </script>

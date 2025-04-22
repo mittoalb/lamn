@@ -6,6 +6,7 @@ lamn/cli.py
 lamn/client.py
 lamn/config.py
 lamn/server.py
+lamn/start_clients.py
 lamn.egg-info/PKG-INFO
 lamn.egg-info/SOURCES.txt
 lamn.egg-info/dependency_links.txt
