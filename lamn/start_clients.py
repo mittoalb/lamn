@@ -39,43 +39,56 @@ def load_agents():
     with open(AGENTS_FILE, "r") as f:
         return json.load(f)
 
-# --- Use pexpect to run SSH command with password ---
+
 def start_client_on(ip, username, password, conda_env, screen_name, launch_cmd):
     print(f"[+] Connecting to {ip} to start client...")
 
-    remote_script = textwrap.dedent(f"""\
-        if screen -list | grep -q {screen_name}; then
-            echo "[!] Client already running on {ip} (screen {screen_name})"
-        else
-            echo "[+] Starting client on {ip}..."
+    ssh_cmd = f"ssh {username}@{ip} 'bash -s'"
+    print(f"[DEBUG] Running SSH command: {ssh_cmd}")
+
+    remote_script = f"""
+        screen -dmS {screen_name} bash -c '
             source ~/.bashrc
             conda activate {conda_env}
-            screen -dmS {screen_name} {launch_cmd}
-        fi
-    """)
+            {launch_cmd}
+        '
+        echo "Client launched OK"
+    """
 
-    ssh_cmd = f"ssh {username}@{ip} 'bash -s'"
     try:
         child = pexpect.spawn(ssh_cmd, timeout=30)
-        i = child.expect(["yes/no", "password:", pexpect.EOF, pexpect.TIMEOUT])
+
+        i = child.expect([
+            "Are you sure you want to continue connecting",  # first-time trust prompt
+            "password:",
+            pexpect.EOF,
+            pexpect.TIMEOUT
+        ])
 
         if i == 0:
+            print(f"[{ip}] Accepting new host key")
             child.sendline("yes")
             child.expect("password:")
             child.sendline(password)
         elif i == 1:
+            print(f"[{ip}] Sending password")
             child.sendline(password)
-        elif i in (2, 3):
-            print(f"[X] Failed to connect to {ip}")
-            return
+        elif i in [2, 3]:
+            raise RuntimeError(f"[{ip}] SSH connection failed (EOF or TIMEOUT)")
 
+        # Send the remote script
         child.sendline(remote_script)
         child.expect(pexpect.EOF)
+
         output = child.before.decode(errors="ignore").strip()
-        print(output)
+        print(f"[{ip}] Remote output:\n{output}")
+
+        if "Client launched OK" not in output:
+            raise RuntimeError(f"[{ip}] Client may not have launched correctly.")
 
     except Exception as e:
-        print(f"[X] Error on {ip}: {e}")
+        print(f"[X] Error starting client on {ip}: {e}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Start lamn clients on all configured agents")
