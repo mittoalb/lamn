@@ -24,19 +24,23 @@ def display_terminal_metrics(url):
         print("Error fetching metrics from", url, ":", e)
         return
 
-    headers = ["Host", "CPU (%)", "Memory (%)", "Disk Read", "Disk Write", "GPU (%)", "Timestamp", "Status"]
+    headers = ["Host", "CPU (%)", "Memory (%)", "Disk Used", "Disk Total", "Disk (%)", "GPU (%)", "Timestamp", "Status"]
     table = []
+
     for ip, data in metrics.items():
         if "error" in data:
-            row = [ip, "N/A", "N/A", "N/A", "N/A", "N/A", "", data.get("error", "Error")]
+            row = [ip, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "", data.get("error", "Error")]
         else:
             host_label = data.get("host", ip)
+            specs = data.get("specs", {})
+            disk_summary = specs.get("disk_summary", {})
             row = [
                 f"{host_label} ({ip})",
                 data.get("cpu", "N/A"),
                 data.get("memory", "N/A"),
-                data.get("percent_used", "N/A"),
-                data.get("disk_write_bytes", "N/A"),
+                disk_summary.get("total_used_human", "N/A"),
+                disk_summary.get("total_space_human", "N/A"),
+                disk_summary.get("percent_used", "N/A"),
                 data.get("gpu", "N/A"),
                 data.get("timestamp", "N/A"),
                 "OK"
