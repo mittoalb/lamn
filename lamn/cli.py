@@ -35,7 +35,7 @@ def display_terminal_metrics(url):
                 f"{host_label} ({ip})",
                 data.get("cpu", "N/A"),
                 data.get("memory", "N/A"),
-                data.get("disk_read_bytes", "N/A"),
+                data.get("percent_used", "N/A"),
                 data.get("disk_write_bytes", "N/A"),
                 data.get("gpu", "N/A"),
                 data.get("timestamp", "N/A"),

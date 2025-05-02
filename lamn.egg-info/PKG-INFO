@@ -1,4 +1,4 @@
-Metadata-Version: 2.2
+Metadata-Version: 2.1
 Name: lamn
 Version: 0.1.0
 Summary: A LAN monitoring tool with server and client functionalities
@@ -18,13 +18,5 @@ Requires-Dist: psutil
 Requires-Dist: requests
 Requires-Dist: py-cpuinfo
 Requires-Dist: pexpect
-Dynamic: author
-Dynamic: author-email
-Dynamic: classifier
-Dynamic: description
-Dynamic: home-page
-Dynamic: requires-dist
-Dynamic: requires-python
-Dynamic: summary
 
 LAN Monitor (lamn) enables remote client management and system monitoring via SSH with server support.

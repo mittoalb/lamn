@@ -140,13 +140,22 @@ def get_metrics():
         logger.error("Error getting GPU utilization: " + str(e))
         gpu_usage = None
 
+    specs = get_specs()
+    disk_summary = specs.get("disk_summary", {})
+
+    #Replaced
+    # "disk_read_bytes": disk_read
+    # "disk_write_bytes": disk_write
+
     metrics = {
         "host": host_name,
         "cpu": cpu_usage,
         "memory": memory_usage,
-        "disk_read_bytes": disk_read,
-        "disk_write_bytes": disk_write,
         "gpu": gpu_usage,
+        "disk_total": disk_summary.get("total_space_human"),
+        "disk_used": disk_summary.get("total_used_human"),
+        "disk_free": disk_summary.get("total_free_human"),
+        "disk_percent_used": disk_summary.get("percent_used"),        
         "timestamp": datetime.datetime.utcnow().isoformat()
     }
     metrics["specs"] = get_specs()
