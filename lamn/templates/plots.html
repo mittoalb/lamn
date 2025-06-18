@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Resource Monitor - Hybrid Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .status-bar {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .section {
+            padding: 30px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .section h2 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-bottom: 3px solid #667eea;
+            display: inline-block;
+            padding-bottom: 5px;
+        }
+        
+        /* Machine Cards */
+        .machine-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .machine-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .machine-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .machine-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .metric-name {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .metric-value {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+        
+        .metric-bar {
+            width: 100px;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-left: 10px;
+        }
+        
+        .metric-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .cpu-fill { background: linear-gradient(90deg, #28a745, #20c997); }
+        .memory-fill { background: linear-gradient(90deg, #007bff, #6610f2); }
+        .disk-fill { background: linear-gradient(90deg, #ffc107, #fd7e14); }
+        .gpu-fill { background: linear-gradient(90deg, #dc3545, #e83e8c); }
+        
+        /* Simple SVG Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chart-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #2c3e50;
+        }
+        
+        .chart-svg {
+            width: 100%;
+            height: 250px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        
+        /* Summary Table */
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .summary-table th,
+        .summary-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .summary-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .summary-table tr:hover {
+            background: #f5f5f5;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .machine-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Machine Resource Monitor</h1>
+            <p>Real-time dashboard with cards, tables, and simple time-series plots</p>
+        </div>
+        
+        <div class="controls">
+            <button class="btn" onclick="loadData()">🔄 Refresh Data</button>
+            <a href="/download_csv" class="btn">💾 Download CSV</a>
+            <a href="/csv_summary" class="btn" target="_blank">📈 View JSON Summary</a>
+        </div>
+        
+        <div class="status-bar" id="statusBar">
+            Ready to load data...
+        </div>
+        
+        <!-- Current Status Cards -->
+        <div class="section">
+            <h2>💻 Current Machine Status</h2>
+            <div class="machine-grid" id="machineGrid">
+                <!-- Machine cards will be inserted here -->
+            </div>
+        </div>
+        
+        <!-- Time Series Plots -->
+        <div class="section">
+            <h2>📈 Resource Usage Over Time</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title">💻 CPU Usage (%)</div>
+                    <svg class="chart-svg" id="cpuChart"></svg>
+                    <div class="chart-legend" id="cpuLegend"></div>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-title">🧠 Memory Usage (%)</div>
+                    <svg class="chart-svg" id="memoryChart"></svg>
+                    <div class="chart-legend" id="memoryLegend"></div>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-title">💾 Disk Usage (%)</div>
+                    <svg class="chart-svg" id="diskChart"></svg>
+                    <div class="chart-legend" id="diskLegend"></div>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-title">🎮 GPU Usage (%)</div>
+                    <svg class="chart-svg" id="gpuChart"></svg>
+                    <div class="chart-legend" id="gpuLegend"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Detailed Table -->
+        <div class="section">
+            <h2>📋 Detailed Information</h2>
+            <table class="summary-table" id="detailTable">
+                <thead>
+                    <tr>
+                        <th>Machine</th>
+                        <th>Last Update</th>
+                        <th>CPU %</th>
+                        <th>Memory %</th>
+                        <th>Disk %</th>
+                        <th>GPU %</th>
+                        <th>Memory GB</th>
+                        <th>Disk GB</th>
+                    </tr>
+                </thead>
+                <tbody id="detailBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let csvData = [];
+        
+        // Colors for different machines
+        const machineColors = [
+            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF',
+            '#4BC0C0', '#FF6384', '#36A2EB', '#FFCE56'
+        ];
+        
+        // Load data from CSV endpoint
+        async function loadData() {
+            document.getElementById('statusBar').textContent = 'Loading CSV data...';
+            document.getElementById('statusBar').style.background = '#ffc107';
+            
+            try {
+                const response = await fetch('/csv_data');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                csvData = await response.json();
+                console.log('CSV data loaded:', csvData.length, 'entries');
+                
+                if (csvData.length === 0) {
+                    throw new Error('No data available in CSV');
+                }
+                
+                updateDisplay();
+                
+                document.getElementById('statusBar').textContent = 
+                    `Data loaded: ${csvData.length} entries from ${getUniqueHostnames().length} machines`;
+                document.getElementById('statusBar').style.background = '#28a745';
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('statusBar').textContent = `Error: ${error.message}`;
+                document.getElementById('statusBar').style.background = '#dc3545';
+            }
+        }
+        
+        // Get unique hostnames
+        function getUniqueHostnames() {
+            return [...new Set(csvData.map(row => row.hostname))];
+        }
+        
+        // Update the display
+        function updateDisplay() {
+            updateMachineCards();
+            updateCharts();
+            updateDetailTable();
+        }
+        
+        // Update machine cards
+        function updateMachineCards() {
+            const machineGrid = document.getElementById('machineGrid');
+            machineGrid.innerHTML = '';
+            
+            const hostnames = getUniqueHostnames();
+            
+            hostnames.forEach(hostname => {
+                // Get latest data for this machine
+                const machineData = csvData
+                    .filter(row => row.hostname === hostname)
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+                
+                if (!machineData) return;
+                
+                const card = document.createElement('div');
+                card.className = 'machine-card';
+                card.innerHTML = `
+                    <div class="machine-name">${hostname}</div>
+                    
+                    <div class="metric">
+                        <span class="metric-name">💻 CPU</span>
+                        <div style="display: flex; align-items: center;">
+                            <span class="metric-value">${machineData.cpu_percent.toFixed(1)}%</span>
+                            <div class="metric-bar">
+                                <div class="metric-fill cpu-fill" style="width: ${Math.min(machineData.cpu_percent, 100)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric">
+                        <span class="metric-name">🧠 Memory</span>
+                        <div style="display: flex; align-items: center;">
+                            <span class="metric-value">${machineData.memory_percent.toFixed(1)}%</span>
+                            <div class="metric-bar">
+                                <div class="metric-fill memory-fill" style="width: ${Math.min(machineData.memory_percent, 100)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric">
+                        <span class="metric-name">💾 Disk</span>
+                        <div style="display: flex; align-items: center;">
+                            <span class="metric-value">${machineData.disk_percent.toFixed(1)}%</span>
+                            <div class="metric-bar">
+                                <div class="metric-fill disk-fill" style="width: ${Math.min(machineData.disk_percent, 100)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric">
+                        <span class="metric-name">🎮 GPU</span>
+                        <div style="display: flex; align-items: center;">
+                            <span class="metric-value">${machineData.gpu_percent.toFixed(1)}%</span>
+                            <div class="metric-bar">
+                                <div class="metric-fill gpu-fill" style="width: ${Math.min(machineData.gpu_percent, 100)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                machineGrid.appendChild(card);
+            });
+        }
+        
+        // Create simple SVG line charts
+        function updateCharts() {
+            const metrics = [
+                { key: 'cpu_percent', chartId: 'cpuChart', legendId: 'cpuLegend' },
+                { key: 'memory_percent', chartId: 'memoryChart', legendId: 'memoryLegend' },
+                { key: 'disk_percent', chartId: 'diskChart', legendId: 'diskLegend' },
+                { key: 'gpu_percent', chartId: 'gpuChart', legendId: 'gpuLegend' }
+            ];
+            
+            const hostnames = getUniqueHostnames();
+            
+            metrics.forEach(metric => {
+                const svg = document.getElementById(metric.chartId);
+                const legend = document.getElementById(metric.legendId);
+                
+                // Clear previous content
+                svg.innerHTML = '';
+                legend.innerHTML = '';
+                
+                // Chart dimensions
+                const width = 400;
+                const height = 200;
+                const margin = { top: 20, right: 20, bottom: 40, left: 40 };
+                const chartWidth = width - margin.left - margin.right;
+                const chartHeight = height - margin.top - margin.bottom;
+                
+                // Set SVG viewBox for responsiveness
+                svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+                
+                // Get time range
+                const timestamps = csvData.map(d => new Date(d.timestamp));
+                const minTime = new Date(Math.min(...timestamps));
+                const maxTime = new Date(Math.max(...timestamps));
+                const timeRange = maxTime - minTime;
+                
+                // Only show chart if we have time series data (more than one time point)
+                if (timeRange === 0) {
+                    svg.innerHTML = `<text x="${width/2}" y="${height/2}" text-anchor="middle" fill="#666">No time series data available</text>`;
+                    return;
+                }
+                
+                // Create chart background
+                svg.innerHTML = `
+                    <rect x="${margin.left}" y="${margin.top}" width="${chartWidth}" height="${chartHeight}" 
+                          fill="white" stroke="#e0e0e0" stroke-width="1"/>
+                    
+                    <!-- Y-axis grid lines -->
+                    <g stroke="#f0f0f0" stroke-width="1">
+                        <line x1="${margin.left}" y1="${margin.top + chartHeight * 0.25}" 
+                              x2="${margin.left + chartWidth}" y2="${margin.top + chartHeight * 0.25}"/>
+                        <line x1="${margin.left}" y1="${margin.top + chartHeight * 0.5}" 
+                              x2="${margin.left + chartWidth}" y2="${margin.top + chartHeight * 0.5}"/>
+                        <line x1="${margin.left}" y1="${margin.top + chartHeight * 0.75}" 
+                              x2="${margin.left + chartWidth}" y2="${margin.top + chartHeight * 0.75}"/>
+                    </g>
+                    
+                    <!-- Y-axis labels -->
+                    <text x="${margin.left - 10}" y="${margin.top}" text-anchor="end" fill="#666" font-size="12">100%</text>
+                    <text x="${margin.left - 10}" y="${margin.top + chartHeight * 0.25}" text-anchor="end" fill="#666" font-size="12">75%</text>
+                    <text x="${margin.left - 10}" y="${margin.top + chartHeight * 0.5}" text-anchor="end" fill="#666" font-size="12">50%</text>
+                    <text x="${margin.left - 10}" y="${margin.top + chartHeight * 0.75}" text-anchor="end" fill="#666" font-size="12">25%</text>
+                    <text x="${margin.left - 10}" y="${margin.top + chartHeight}" text-anchor="end" fill="#666" font-size="12">0%</text>
+                    
+                    <!-- X-axis labels -->
+                    <text x="${margin.left}" y="${margin.top + chartHeight + 20}" text-anchor="middle" fill="#666" font-size="10">${minTime.toLocaleTimeString()}</text>
+                    <text x="${margin.left + chartWidth}" y="${margin.top + chartHeight + 20}" text-anchor="middle" fill="#666" font-size="10">${maxTime.toLocaleTimeString()}</text>
+                `;
+                
+                // Draw lines for each machine
+                hostnames.forEach((hostname, index) => {
+                    const machineData = csvData
+                        .filter(row => row.hostname === hostname)
+                        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    
+                    if (machineData.length < 2) return; // Need at least 2 points for a line
+                    
+                    const color = machineColors[index % machineColors.length];
+                    
+                    // Create path
+                    let pathData = '';
+                    machineData.forEach((point, i) => {
+                        const x = margin.left + ((new Date(point.timestamp) - minTime) / timeRange) * chartWidth;
+                        const y = margin.top + chartHeight - ((point[metric.key] || 0) / 100) * chartHeight;
+                        
+                        if (i === 0) {
+                            pathData += `M ${x} ${y}`;
+                        } else {
+                            pathData += ` L ${x} ${y}`;
+                        }
+                    });
+                    
+                    // Add line to SVG
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', pathData);
+                    path.setAttribute('stroke', color);
+                    path.setAttribute('stroke-width', '2');
+                    path.setAttribute('fill', 'none');
+                    svg.appendChild(path);
+                    
+                    // Add dots
+                    machineData.forEach(point => {
+                        const x = margin.left + ((new Date(point.timestamp) - minTime) / timeRange) * chartWidth;
+                        const y = margin.top + chartHeight - ((point[metric.key] || 0) / 100) * chartHeight;
+                        
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', x);
+                        circle.setAttribute('cy', y);
+                        circle.setAttribute('r', '3');
+                        circle.setAttribute('fill', color);
+                        svg.appendChild(circle);
+                    });
+                    
+                    // Add to legend
+                    const legendItem = document.createElement('div');
+                    legendItem.className = 'legend-item';
+                    legendItem.innerHTML = `
+                        <div class="legend-color" style="background: ${color}"></div>
+                        <span>${hostname}</span>
+                    `;
+                    legend.appendChild(legendItem);
+                });
+            });
+        }
+        
+        // Update detail table
+        function updateDetailTable() {
+            const detailBody = document.getElementById('detailBody');
+            detailBody.innerHTML = '';
+            
+            const hostnames = getUniqueHostnames();
+            
+            hostnames.forEach(hostname => {
+                const machineData = csvData
+                    .filter(row => row.hostname === hostname)
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+                
+                if (!machineData) return;
+                
+                const row = detailBody.insertRow();
+                row.insertCell(0).textContent = hostname;
+                row.insertCell(1).textContent = new Date(machineData.timestamp).toLocaleString();
+                row.insertCell(2).textContent = machineData.cpu_percent.toFixed(1) + '%';
+                row.insertCell(3).textContent = machineData.memory_percent.toFixed(1) + '%';
+                row.insertCell(4).textContent = machineData.disk_percent.toFixed(1) + '%';
+                row.insertCell(5).textContent = machineData.gpu_percent.toFixed(1) + '%';
+                row.insertCell(6).textContent = machineData.total_memory_gb.toFixed(1) + ' GB';
+                row.insertCell(7).textContent = machineData.total_disk_gb.toFixed(1) + ' GB';
+            });
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(loadData, 30000);
+        });
+    </script>
+</body>
+</html>

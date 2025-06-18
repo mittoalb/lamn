@@ -143,10 +143,6 @@ def get_metrics():
     specs = get_specs()
     disk_summary = specs.get("disk_summary", {})
 
-    #Replaced
-    # "disk_read_bytes": disk_read
-    # "disk_write_bytes": disk_write
-
     metrics = {
         "host": host_name,
         "cpu": cpu_usage,

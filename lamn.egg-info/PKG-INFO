@@ -1,10 +1,13 @@
-Metadata-Version: 2.1
+Metadata-Version: 1.2
 Name: lamn
 Version: 0.1.0
 Summary: A LAN monitoring tool with server and client functionalities
-Home-page: https://github.com/yourusername/lamn
+Home-page: https://github.com/mittoalb/lamn
 Author: Alberto Mittone
 Author-email: amittone@anl.gov
+License: UNKNOWN
+Description: LAN Monitor (lamn) enables remote client management and system monitoring via SSH with server support.
+Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: Operating System :: OS Independent
 Classifier: License :: OSI Approved :: MIT License
@@ -13,10 +16,3 @@ Classifier: Topic :: System :: Monitoring
 Classifier: Environment :: Console
 Requires-Python: >=3.6
 License-File: LICENSE
-Requires-Dist: Flask
-Requires-Dist: psutil
-Requires-Dist: requests
-Requires-Dist: py-cpuinfo
-Requires-Dist: pexpect
-
-LAN Monitor (lamn) enables remote client management and system monitoring via SSH with server support.

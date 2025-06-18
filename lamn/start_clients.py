@@ -75,16 +75,16 @@ def start_client_on(ip, username, password, conda_env, screen_name, launch_cmd):
                 print(f"[{ip}] Sending password")
                 child.sendline(password)
             elif i == 2:
-                print(f"[{ip}] ✅ SSH completed (EOF)")
+                print(f"[{ip}] SSH completed (EOF)")
                 break
             elif i == 3:
-                print(f"[{ip}] ❌ Timeout")
+                print(f"[{ip}] Timeout")
                 break
 
         # Send the remote script
         child.send(remote_script.encode("utf-8") + b"\nexit\n")
         child.expect(pexpect.EOF)
-        print(f"[{ip}] ✅ Launch command sent and connection closed")
+        print(f"[{ip}] Launch command sent and connection closed")
 
     except Exception as e:
         print(f"[X] Error on {ip}: {e}")

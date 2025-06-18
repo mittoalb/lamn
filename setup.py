@@ -7,7 +7,7 @@ setup(
     author_email="amittone@anl.gov",
     description="A LAN monitoring tool with server and client functionalities",
     long_description="LAN Monitor (lamn) enables remote client management and system monitoring via SSH with server support.",
-    url="https://github.com/yourusername/lamn",  # update if public
+    url="https://github.com/mittoalb/lamn",
     packages=find_packages(),
     include_package_data=True,
     package_data={
