@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Resource Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            margin: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        
+        .machine-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .machine-card {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+        
+        .machine-name {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px;
+        }
+        
+        .metric-value {
+            font-weight: bold;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        tr:hover {
+            background: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Machine Resource Monitor</h1>
+            <p>Real-time monitoring dashboard</p>
+        </div>
+        
+        <div class="controls">
+            <button class="btn" onclick="loadData()">🔄 Refresh Data</button>
+            <a href="/download_csv" class="btn">💾 Download CSV</a>
+            <a href="/csv_summary" class="btn" target="_blank">📈 View Summary</a>
+        </div>
+        
+        <div id="status" class="status info">Ready to load data...</div>
+        
+        <h2>💻 Current Machine Status</h2>
+        <div id="machineGrid" class="machine-grid">
+            <!-- Machine cards will be inserted here -->
+        </div>
+        
+        <h2>📋 Detailed Information</h2>
+        <table id="detailTable">
+            <thead>
+                <tr>
+                    <th>Machine</th>
+                    <th>Last Update</th>
+                    <th>CPU %</th>
+                    <th>Memory %</th>
+                    <th>Disk %</th>
+                    <th>GPU %</th>
+                    <th>Memory GB</th>
+                    <th>Disk GB</th>
+                </tr>
+            </thead>
+            <tbody id="detailBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let csvData = [];
+        
+        async function loadData() {
+            const status = document.getElementById('status');
+            status.textContent = 'Loading CSV data...';
+            status.className = 'status info';
+            
+            try {
+                const response = await fetch('/csv_data');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                csvData = await response.json();
+                console.log('CSV data loaded:', csvData.length, 'entries');
+                
+                if (csvData.length === 0) {
+                    throw new Error('No data available in CSV');
+                }
+                
+                updateDisplay();
+                
+                status.textContent = `Data loaded: ${csvData.length} entries from ${getUniqueHostnames().length} machines`;
+                status.className = 'status success';
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                status.textContent = `Error: ${error.message}`;
+                status.className = 'status error';
+            }
+        }
+        
+        function getUniqueHostnames() {
+            return [...new Set(csvData.map(row => row.hostname))];
+        }
+        
+        function updateDisplay() {
+            updateMachineCards();
+            updateDetailTable();
+        }
+        
+        function updateMachineCards() {
+            const machineGrid = document.getElementById('machineGrid');
+            machineGrid.innerHTML = '';
+            
+            const hostnames = getUniqueHostnames();
+            
+            hostnames.forEach(hostname => {
+                const machineData = csvData
+                    .filter(row => row.hostname === hostname)
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+                
+                if (!machineData) return;
+                
+                const card = document.createElement('div');
+                card.className = 'machine-card';
+                card.innerHTML = `
+                    <div class="machine-name">${hostname}</div>
+                    <div class="metric">
+                        <span>💻 CPU:</span>
+                        <span class="metric-value">${machineData.cpu_percent.toFixed(1)}%</span>
+                    </div>
+                    <div class="metric">
+                        <span>🧠 Memory:</span>
+                        <span class="metric-value">${machineData.memory_percent.toFixed(1)}%</span>
+                    </div>
+                    <div class="metric">
+                        <span>💾 Disk:</span>
+                        <span class="metric-value">${machineData.disk_percent.toFixed(1)}%</span>
+                    </div>
+                    <div class="metric">
+                        <span>🎮 GPU:</span>
+                        <span class="metric-value">${machineData.gpu_percent.toFixed(1)}%</span>
+                    </div>
+                `;
+                
+                machineGrid.appendChild(card);
+            });
+        }
+        
+        function updateDetailTable() {
+            const detailBody = document.getElementById('detailBody');
+            detailBody.innerHTML = '';
+            
+            const hostnames = getUniqueHostnames();
+            
+            hostnames.forEach(hostname => {
+                const machineData = csvData
+                    .filter(row => row.hostname === hostname)
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+                
+                if (!machineData) return;
+                
+                const row = detailBody.insertRow();
+                row.insertCell(0).textContent = hostname;
+                row.insertCell(1).textContent = new Date(machineData.timestamp).toLocaleString();
+                row.insertCell(2).textContent = machineData.cpu_percent.toFixed(1) + '%';
+                row.insertCell(3).textContent = machineData.memory_percent.toFixed(1) + '%';
+                row.insertCell(4).textContent = machineData.disk_percent.toFixed(1) + '%';
+                row.insertCell(5).textContent = machineData.gpu_percent.toFixed(1) + '%';
+                row.insertCell(6).textContent = machineData.total_memory_gb.toFixed(1) + ' GB';
+                row.insertCell(7).textContent = machineData.total_disk_gb.toFixed(1) + ' GB';
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            setInterval(loadData, 30000); // Auto-refresh every 30 seconds
+        });
+    </script>
+</body>
+</html>

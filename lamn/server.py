@@ -152,6 +152,11 @@ def csv_data():
         # Read CSV file
         df = pd.read_csv(csv_file_path)
         
+        # Debug: Print column names and first few rows
+        print("CSV Columns:", df.columns.tolist())
+        print("First row:", df.iloc[0].to_dict() if len(df) > 0 else "No data")
+        print("Data types:", df.dtypes.to_dict())
+        
         # Convert to JSON format for charts
         data = df.to_dict('records')
         return jsonify(data)
@@ -159,6 +164,7 @@ def csv_data():
     except FileNotFoundError:
         return jsonify([])
     except Exception as e:
+        print(f"CSV data error: {e}")
         return jsonify({"error": str(e)})
 
 @app.route('/download_csv')
@@ -199,6 +205,10 @@ def csv_summary():
 def plots():
     return render_template('plots.html')
 
+@app.route('/hybrid')
+def hybrid():
+    return render_template('hybrid_plots.html')
+
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
     func = request.environ.get('werkzeug.server.shutdown')
@@ -213,6 +223,7 @@ def start():
     print("View CSV summary at: http://localhost:8000/csv_summary")
     print("Download CSV at: http://localhost:8000/download_csv")
     print("View plots at: http://localhost:8000/plots")
+    print("View hybrid dashboard at: http://localhost:8000/hybrid")
     app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
