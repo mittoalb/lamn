@@ -151,7 +151,10 @@ def csv_data():
     try:
         # Read CSV file
         df = pd.read_csv(csv_file_path)
-        
+        if len(df) > 1000:
+            df = df.tail(1000)
+            print(f"CSV file has many entries, returning last 1000 rows")
+            
         # Debug: Print column names and first few rows
         print("CSV Columns:", df.columns.tolist())
         print("First row:", df.iloc[0].to_dict() if len(df) > 0 else "No data")
