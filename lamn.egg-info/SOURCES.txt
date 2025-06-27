@@ -14,3 +14,4 @@ lamn.egg-info/entry_points.txt
 lamn.egg-info/requires.txt
 lamn.egg-info/top_level.txt
 lamn/templates/dashboard.html
+test/tester.py
