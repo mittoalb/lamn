@@ -45,14 +45,34 @@ logged_machines = set()
 
 # --- SSH polling -----------------------------------------------------------
 def _remote_cmd(settings):
-    """Build the remote shell command that reads probe.py from stdin."""
-    py = settings.get("remote_python") or "python3"
+    """Build the remote shell command that reads probe.py from stdin.
+
+    Non-interactive SSH shells often skip conda init in ~/.bashrc, so instead
+    of `conda activate` we locate the env's python binary directly in the
+    common install prefixes. Users can override with remote_python.
+    """
+    override = settings.get("remote_python_path")
+    if override:
+        return [override, "-"]
+
     env = settings.get("conda_env")
-    if env:
-        # Login shell picks up conda init from ~/.bashrc.
-        inner = f"conda activate {shlex.quote(env)} && {py} -"
-        return ["bash", "-lc", inner]
-    return [py, "-"]
+    fallback = settings.get("remote_python") or "python3"
+    if not env:
+        return [fallback, "-"]
+
+    fb_q = shlex.quote(fallback)
+    inner = (
+        f'for p in '
+        f'"$HOME/miniconda3/envs/{env}/bin/python" '
+        f'"$HOME/anaconda3/envs/{env}/bin/python" '
+        f'"$HOME/miniforge3/envs/{env}/bin/python" '
+        f'"$HOME/mambaforge/envs/{env}/bin/python" '
+        f'"/opt/conda/envs/{env}/bin/python" '
+        f'"/opt/miniconda3/envs/{env}/bin/python"; do '
+        f'[ -x "$p" ] && exec "$p" -; done; '
+        f'exec {fb_q} -'
+    )
+    return ["sh", "-c", inner]
 
 
 def _ssh_argv(ip, settings):

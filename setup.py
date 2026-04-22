@@ -18,7 +18,6 @@ setup(
         "psutil",
         "requests",
         "py-cpuinfo",
-        "pexpect"
     ],
     entry_points={
         "console_scripts": [
