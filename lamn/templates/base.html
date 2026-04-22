@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}lamn{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #eef2f7;
+      --panel: #ffffff;
+      --ink: #2c3e50;
+      --muted: #7a8896;
+      --accent: #3498db;
+      --ok: #27ae60;
+      --err: #c0392b;
+      --border: #e1e8ef;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header {
+      background: var(--ink);
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    header .brand {
+      font-weight: 700;
+      font-size: 1.2em;
+      letter-spacing: 0.5px;
+    }
+    nav a {
+      color: #cfd9e4;
+      text-decoration: none;
+      margin-right: 18px;
+      font-size: 0.95em;
+      padding-bottom: 2px;
+      border-bottom: 2px solid transparent;
+    }
+    nav a:hover { color: #fff; }
+    nav a.active { color: #fff; border-bottom-color: var(--accent); }
+    .container {
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 20px;
+    }
+    .panel {
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      margin-bottom: 20px;
+    }
+    h1, h2 { margin-top: 0; color: var(--ink); }
+    h2 { font-size: 1.15em; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95em;
+    }
+    thead th {
+      background: var(--ink);
+      color: #fff;
+      padding: 10px;
+      text-align: left;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+    tbody td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr:hover { background: #f7f9fc; }
+    a.row-link { color: var(--accent); text-decoration: none; }
+    a.row-link:hover { text-decoration: underline; }
+    .ok { color: var(--ok); font-weight: 600; }
+    .err { color: var(--err); font-weight: 600; }
+    .muted { color: var(--muted); }
+    .bar {
+      display: inline-block;
+      width: 80px;
+      height: 8px;
+      background: #e1e8ef;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 8px;
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+    }
+    .bar > span.hot { background: var(--err); }
+    .kv { display: grid; grid-template-columns: 180px 1fr; row-gap: 6px; font-size: 0.95em; }
+    .kv dt { color: var(--muted); }
+    .kv dd { margin: 0; }
+    code { background: #f1f5f9; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.8em;
+      background: #eef2f7;
+      color: var(--ink);
+    }
+    .pill.ok { background: #e6f5ec; color: var(--ok); }
+    .pill.err { background: #fbe9e7; color: var(--err); }
+    footer {
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.85em;
+      padding: 20px 0 40px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">lamn</div>
+    <nav>
+      <a href="/" class="{% if active=='dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="/agents" class="{% if active=='agents' %}active{% endif %}">Agents</a>
+      <a href="/metrics" class="{% if active=='api' %}active{% endif %}">/metrics (JSON)</a>
+    </nav>
+  </header>
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+  <footer>lamn &middot; SSH pull-mode monitor</footer>
+</body>
+</html>

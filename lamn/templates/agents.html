@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Agents &middot; lamn{% endblock %}
+{% block content %}
+<div class="panel">
+  <h1>Configured agents</h1>
+  <p class="muted">
+    Edit the list via CLI: <code>lamn add &lt;ip&gt;</code> / <code>lamn remove &lt;ip&gt;</code>.
+    Source: <code>~/.agents.json</code>.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>IP</th>
+        <th>Hostname</th>
+        <th>Status</th>
+        <th>Last update</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+<script>
+const AGENTS = {{ agents|tojson }};
+async function refresh() {
+  const res = await fetch('/metrics');
+  const data = await res.json();
+  const tbody = document.getElementById('rows');
+  let html = "";
+  for (const ip of AGENTS) {
+    const e = data[ip];
+    let host = "–", status = '<span class="pill">unseen</span>', ts = "";
+    if (e) {
+      if (e.error) {
+        status = `<span class="pill err">offline</span>`;
+        host = '<span class="muted">' + (e.error.split(':')[0] || 'error') + '</span>';
+      } else {
+        status = `<span class="pill ok">online</span>`;
+        host = (e.host || "").split(".")[0] || "–";
+        ts = e.timestamp || "";
+      }
+    }
+    html += `<tr>
+      <td><a class="row-link" href="/host/${encodeURIComponent(ip)}">${ip}</a></td>
+      <td>${host}</td>
+      <td>${status}</td>
+      <td class="muted">${ts}</td>
+      <td><a class="row-link" href="/host/${encodeURIComponent(ip)}">details &rarr;</a></td>
+    </tr>`;
+  }
+  if (!AGENTS.length) {
+    html = '<tr><td colspan="5" class="muted">No agents configured.</td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+{% endblock %}

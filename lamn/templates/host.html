@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ ip }} &middot; lamn{% endblock %}
+{% block content %}
+<div class="panel">
+  <h1 id="hostTitle">{{ ip }}</h1>
+  <p><a href="/" class="row-link">&larr; Back to dashboard</a></p>
+  <div id="status"></div>
+</div>
+
+<div class="panel">
+  <h2>Live metrics</h2>
+  <dl class="kv" id="metrics"></dl>
+</div>
+
+<div class="panel">
+  <h2>Hardware specs</h2>
+  <dl class="kv" id="specs"></dl>
+</div>
+
+<div class="panel">
+  <h2>Disks</h2>
+  <table>
+    <thead><tr><th>Device</th><th>Mount</th><th>Used</th><th>Free</th><th>Total</th><th>%</th></tr></thead>
+    <tbody id="disks"></tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h2>Network interfaces</h2>
+  <table>
+    <thead><tr><th>Interface</th><th>Addresses</th><th>Speed</th></tr></thead>
+    <tbody id="nics"></tbody>
+  </table>
+</div>
+
+<script>
+const IP = {{ ip|tojson }};
+function fmtBytes(n) {
+  if (!n && n !== 0) return "N/A";
+  const u = ['B','KB','MB','GB','TB','PB'];
+  let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(2)} ${u[i]}`;
+}
+function row(k, v) { return `<dt>${k}</dt><dd>${v ?? "<span class='muted'>N/A</span>"}</dd>`; }
+async function refresh() {
+  const res = await fetch('/metrics');
+  const all = await res.json();
+  const e = all[IP];
+  const statusEl = document.getElementById('status');
+  if (!e) {
+    statusEl.innerHTML = '<span class="pill err">unknown</span> no data for this host yet';
+    return;
+  }
+  if (e.error) {
+    statusEl.innerHTML = `<span class="pill err">offline</span> <span class="err">${e.error}</span>`;
+    document.getElementById('metrics').innerHTML = "";
+    return;
+  }
+  document.getElementById('hostTitle').textContent = `${e.host || IP}`;
+  statusEl.innerHTML = `<span class="pill ok">online</span> <span class="muted">last update ${e.timestamp || ''}</span>`;
+
+  const m = document.getElementById('metrics');
+  m.innerHTML = [
+    row('IP', IP),
+    row('Hostname', e.host),
+    row('CPU usage', e.cpu !== undefined ? `${e.cpu}%` : null),
+    row('Memory usage', e.memory !== undefined ? `${e.memory}%` : null),
+    row('GPU usage', e.gpu !== null && e.gpu !== undefined ? `${e.gpu}%` : null),
+    row('Disk used', e.disk_used),
+    row('Disk free', e.disk_free),
+    row('Disk total', e.disk_total),
+    row('Disk %', e.disk_percent_used !== undefined ? `${e.disk_percent_used}%` : null),
+    row('Timestamp', e.timestamp),
+  ].join("");
+
+  const s = e.specs || {};
+  const os = s.os || {};
+  const sp = document.getElementById('specs');
+  sp.innerHTML = [
+    row('CPU model', s.cpu),
+    row('GPU', s.gpu),
+    row('RAM', fmtBytes(s.ram)),
+    row('OS', `${os.system || ''} ${os.release || ''}`.trim()),
+    row('Platform', os.platform),
+  ].join("");
+
+  const dt = document.getElementById('disks');
+  dt.innerHTML = (s.disks || []).map(d => `
+    <tr>
+      <td><code>${d.device}</code></td>
+      <td><code>${d.mountpoint}</code></td>
+      <td>${fmtBytes(d.used)}</td>
+      <td>${fmtBytes(d.free)}</td>
+      <td>${fmtBytes(d.total)}</td>
+      <td>${d.percent_used}%</td>
+    </tr>`).join("") || '<tr><td colspan="6" class="muted">None</td></tr>';
+
+  const nt = document.getElementById('nics');
+  nt.innerHTML = Object.entries(s.connectivity || {}).map(([iface, v]) => `
+    <tr>
+      <td><code>${iface}</code></td>
+      <td>${(v.addresses || []).join(', ') || '<span class="muted">—</span>'}</td>
+      <td>${v.speed ? v.speed + ' Mbps' : '<span class="muted">N/A</span>'}</td>
+    </tr>`).join("") || '<tr><td colspan="3" class="muted">None</td></tr>';
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+{% endblock %}

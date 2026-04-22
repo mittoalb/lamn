@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template, request
 
 from lamn.config import load_agents, load_settings
 
@@ -157,32 +157,24 @@ threading.Thread(target=polling_loop, daemon=True).start()
 # --- Flask routes ----------------------------------------------------------
 @app.route('/')
 def index():
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', active='dashboard')
+
+
+@app.route('/agents')
+def agents_page():
+    return render_template('agents.html', active='agents', agents=load_agents())
+
+
+@app.route('/host/<ip>')
+def host_page(ip):
+    if ip not in load_agents():
+        abort(404)
+    return render_template('host.html', active='', ip=ip)
 
 
 @app.route('/metrics', methods=['GET'])
 def metrics():
     return jsonify(metrics_data)
-
-
-@app.route('/specs', methods=['GET'])
-def specs():
-    try:
-        with open('logs/machine_specs.log', 'r') as f:
-            out = []
-            for line in f:
-                if not line.strip():
-                    continue
-                parts = line.strip().split(' ', 2)
-                if len(parts) >= 3:
-                    rec = json.loads(parts[2])
-                    rec['logged_at'] = f"{parts[0]} {parts[1]}"
-                    out.append(rec)
-            return jsonify(out)
-    except FileNotFoundError:
-        return jsonify([])
-    except Exception as e:
-        return jsonify({"error": str(e)})
 
 
 @app.route('/shutdown', methods=['POST'])
@@ -195,8 +187,8 @@ def shutdown():
 
 
 def start():
-    print("Complete machine data will be logged to: logs/machine_specs.log")
-    print("View specs at: http://localhost:8000/specs")
+    print("Dashboard: http://localhost:8000/")
+    print("Agents:    http://localhost:8000/agents")
     app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)
 
 
