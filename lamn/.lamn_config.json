@@ -1,0 +1,5 @@
+{
+  "conda_env": "python_servers",
+  "screen_name": "lamn_client",
+  "launch_cmd": "python ~/Software/lamn/lamn/cli.py client start"
+}

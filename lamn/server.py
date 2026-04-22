@@ -1,76 +1,176 @@
-from flask import Flask, render_template, jsonify, request
-import requests, threading, time, logging
-from lamn.config import load_agents
+import json
+import logging
 import os
+import shlex
+import subprocess
+import threading
+import time
+from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
-# --- Setup logging ---
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+from flask import Flask, jsonify, render_template, request
 
-# --- Setup Flask ---
+from lamn.config import load_agents, load_settings
+
+PROBE_PATH = os.path.join(os.path.dirname(__file__), "probe.py")
+
+
+# --- logging ---------------------------------------------------------------
+def setup_logging():
+    os.makedirs('logs', exist_ok=True)
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
+    logging.getLogger('urllib3').setLevel(logging.ERROR)
+
+    specs_logger = logging.getLogger('machine_specs')
+    specs_logger.setLevel(logging.INFO)
+    specs_logger.propagate = False
+
+    fh = RotatingFileHandler('logs/machine_specs.log',
+                             maxBytes=50 * 1024 * 1024, backupCount=3)
+    fh.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+    specs_logger.addHandler(fh)
+    return specs_logger
+
+
+specs_logger = setup_logging()
+
+# --- Flask -----------------------------------------------------------------
 template_dir = os.path.join(os.path.dirname(__file__), "templates")
 app = Flask(__name__, template_folder=template_dir)
+app.logger.disabled = True
 
-# --- Shared metrics dictionary ---
 metrics_data = {}
+logged_machines = set()
 
-# --- Get list of agent IPs from config ---
-def get_agent_ips():
-    return load_agents()
 
-# --- Poll one agent ---
-def poll_agent(ip):
+# --- SSH polling -----------------------------------------------------------
+def _remote_cmd(settings):
+    """Build the remote shell command that reads probe.py from stdin."""
+    py = settings.get("remote_python") or "python3"
+    env = settings.get("conda_env")
+    if env:
+        # Login shell picks up conda init from ~/.bashrc.
+        inner = f"conda activate {shlex.quote(env)} && {py} -"
+        return ["bash", "-lc", inner]
+    return [py, "-"]
+
+
+def _ssh_argv(ip, settings):
+    user = settings["ssh_user"]
+    timeout = str(settings["connect_timeout"])
+    opts = list(settings.get("ssh_options", []))
+    argv = ["ssh", "-o", f"ConnectTimeout={timeout}", *opts, f"{user}@{ip}"]
+    argv.extend(_remote_cmd(settings))
+    return argv
+
+
+def poll_agent(ip, settings, probe_src):
+    argv = _ssh_argv(ip, settings)
     try:
-        response = requests.get(f"http://{ip}:5000/metrics", timeout=2)
-        metrics_data[ip] = response.json()
+        proc = subprocess.run(
+            argv,
+            input=probe_src,
+            capture_output=True,
+            text=True,
+            timeout=settings["connect_timeout"] + 15,
+        )
+    except subprocess.TimeoutExpired:
+        metrics_data[ip] = {"error": "SSH poll timed out"}
+        return
     except Exception as e:
-        logger.debug(f"Client {ip} not reachable: {e}")
-        metrics_data[ip] = {"error": "Client not running/not reachable"}
+        metrics_data[ip] = {"error": f"SSH failed: {e}"}
+        return
 
-# --- Main polling loop ---
+    if proc.returncode != 0:
+        err = (proc.stderr or "").strip().splitlines()[-1:] or ["unknown error"]
+        metrics_data[ip] = {"error": f"probe exit {proc.returncode}: {err[0]}"}
+        return
+
+    try:
+        data = json.loads(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError) as e:
+        metrics_data[ip] = {"error": f"invalid probe output: {e}"}
+        return
+
+    metrics_data[ip] = data
+
+    if ip not in logged_machines:
+        specs_logger.info(json.dumps({
+            "ip": ip,
+            "timestamp": datetime.now().isoformat(),
+            "machine_data": data,
+        }, separators=(',', ':')))
+        logged_machines.add(ip)
+        print(f"Logged complete data for machine {ip}")
+
+
 def polling_loop():
-    logger.info("Waiting 10 seconds before starting agent polling...")
-    time.sleep(10)  # Delay at server startup to allow clients to boot
+    print("Starting machine monitoring (SSH pull mode)...")
+    with open(PROBE_PATH, "r") as f:
+        probe_src = f.read()
 
     while True:
-        ips = get_agent_ips()
+        settings = load_settings()
+        ips = load_agents()
         threads = []
-
         for ip in ips:
-            t = threading.Thread(target=poll_agent, args=(ip,))
+            t = threading.Thread(target=poll_agent,
+                                 args=(ip, settings, probe_src))
             t.start()
             threads.append(t)
-
         for t in threads:
             t.join()
+        time.sleep(settings.get("poll_interval", 15))
 
-        time.sleep(5)  # Poll all agents every 5 seconds
 
-# --- Background polling thread ---
 threading.Thread(target=polling_loop, daemon=True).start()
 
-# --- Flask Routes ---
+
+# --- Flask routes ----------------------------------------------------------
 @app.route('/')
 def index():
     return render_template('dashboard.html')
+
 
 @app.route('/metrics', methods=['GET'])
 def metrics():
     return jsonify(metrics_data)
 
+
+@app.route('/specs', methods=['GET'])
+def specs():
+    try:
+        with open('logs/machine_specs.log', 'r') as f:
+            out = []
+            for line in f:
+                if not line.strip():
+                    continue
+                parts = line.strip().split(' ', 2)
+                if len(parts) >= 3:
+                    rec = json.loads(parts[2])
+                    rec['logged_at'] = f"{parts[0]} {parts[1]}"
+                    out.append(rec)
+            return jsonify(out)
+    except FileNotFoundError:
+        return jsonify([])
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
-    logger.info("Shutdown endpoint called")
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
     func()
     return 'Server shutting down...'
 
-# --- Server Entrypoint ---
+
 def start():
-    logger.info("Starting server on port 8000")
+    print("Complete machine data will be logged to: logs/machine_specs.log")
+    print("View specs at: http://localhost:8000/specs")
     app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)
+
 
 if __name__ == '__main__':
     start()
