@@ -3,8 +3,8 @@
 {% block content %}
 <div class="panel">
   <h1>Live metrics</h1>
-  <p class="muted">Polling every <span id="pollEvery">–</span>s &middot;
-    last updated <span id="lastUpdated">–</span></p>
+  <p class="muted">Polling every <span id="pollEvery">5</span>s &middot;
+    last refresh <span id="lastUpdated">–</span></p>
   <table>
     <thead>
       <tr>
@@ -22,16 +22,13 @@
   </table>
 </div>
 <script>
-function bar(pct, hotAt) {
+function bar(pct) {
   if (pct === null || pct === undefined || isNaN(pct)) return "<span class='muted'>N/A</span>";
   const p = Math.max(0, Math.min(100, Number(pct)));
-  const hot = hotAt !== undefined && p >= hotAt ? "hot" : "";
-  return `${p.toFixed(1)}%<span class="bar"><span class="${hot}" style="width:${p}%"></span></span>`;
+  const cls = p >= 90 ? "hot" : p >= 75 ? "warn" : "";
+  return `${p.toFixed(1)}%<span class="bar"><span class="${cls}" style="width:${p}%"></span></span>`;
 }
-function shortHost(h, ip) {
-  if (!h) return ip;
-  return h.split(".")[0];
-}
+function shortHost(h, ip) { return h ? h.split(".")[0] : ip; }
 function ago(ts) {
   if (!ts) return "";
   const t = new Date(ts.endsWith("Z") ? ts : ts + "Z");
@@ -40,6 +37,14 @@ function ago(ts) {
   if (s < 3600) return `${Math.floor(s/60)}m ago`;
   return `${Math.floor(s/3600)}h ago`;
 }
+function statusPill(e) {
+  const st = e._status || (e._last_success ? "stale" : "unknown");
+  if (st === "online")  return '<span class="pill ok">online</span>';
+  if (st === "stale")   return '<span class="pill warn" title="poll failed, showing last known">stale</span>';
+  if (st === "offline") return '<span class="pill err">offline</span>';
+  return '<span class="pill">unknown</span>';
+}
+
 async function refresh() {
   const res = await fetch('/metrics');
   const data = await res.json();
@@ -48,35 +53,39 @@ async function refresh() {
   let html = "";
   for (const ip of ips) {
     const e = data[ip];
-    if (e.error) {
-      html += `<tr>
+    const st = e._status || (e._last_success ? "stale" : "unknown");
+    const rowCls = st === "stale" ? "stale" : st === "offline" ? "offline" : "";
+    const hasData = e._last_success || (e.host && e.cpu !== undefined);
+
+    if (!hasData) {
+      html += `<tr class="${rowCls}">
         <td><a class="row-link" href="/host/${encodeURIComponent(ip)}">${ip}</a></td>
-        <td colspan="6" class="err">${e.error}</td>
-        <td><span class="pill err">offline</span></td>
+        <td colspan="6" class="err">${e._last_error || "no data yet"}</td>
+        <td>${statusPill(e)}</td>
       </tr>`;
       continue;
     }
+
     const host = shortHost(e.host, ip);
     const ds = (e.specs && e.specs.disk_summary) || {};
     const free = ds.total_free_human || e.disk_free || "N/A";
     const total = ds.total_space_human || e.disk_total || "N/A";
     const diskPct = ds.percent_used ?? e.disk_percent_used;
-    html += `<tr>
+    html += `<tr class="${rowCls}">
       <td><a class="row-link" href="/host/${encodeURIComponent(ip)}">${host}</a>
         <div class="muted" style="font-size:0.8em">${ip}</div></td>
-      <td>${bar(e.cpu, 85)}</td>
-      <td>${bar(e.memory, 85)}</td>
-      <td>${bar(e.gpu, 85)}</td>
-      <td>${bar(diskPct, 90)}</td>
+      <td>${bar(e.cpu)}</td>
+      <td>${bar(e.memory)}</td>
+      <td>${bar(e.gpu)}</td>
+      <td>${bar(diskPct)}</td>
       <td>${free} / ${total}</td>
-      <td class="muted">${ago(e.timestamp)}</td>
-      <td><span class="pill ok">online</span></td>
+      <td class="muted" title="${e._last_success || ''}">${ago(e._last_success || e.timestamp)}</td>
+      <td>${statusPill(e)}</td>
     </tr>`;
   }
   tbody.innerHTML = html || '<tr><td colspan="8" class="muted">No agents configured. Add one with <code>lamn add &lt;ip&gt;</code>.</td></tr>';
   document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
 }
-document.getElementById('pollEvery').textContent = "5";
 refresh();
 setInterval(refresh, 5000);
 </script>

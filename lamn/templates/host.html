@@ -42,22 +42,37 @@ function fmtBytes(n) {
   return `${n.toFixed(2)} ${u[i]}`;
 }
 function row(k, v) { return `<dt>${k}</dt><dd>${v ?? "<span class='muted'>N/A</span>"}</dd>`; }
+function statusPill(st) {
+  if (st === "online")  return '<span class="pill ok">online</span>';
+  if (st === "stale")   return '<span class="pill warn">stale</span>';
+  if (st === "offline") return '<span class="pill err">offline</span>';
+  return '<span class="pill">unknown</span>';
+}
 async function refresh() {
   const res = await fetch('/metrics');
   const all = await res.json();
   const e = all[IP];
   const statusEl = document.getElementById('status');
   if (!e) {
-    statusEl.innerHTML = '<span class="pill err">unknown</span> no data for this host yet';
+    statusEl.innerHTML = statusPill("unknown") + ' <span class="muted">no data for this host yet</span>';
     return;
   }
-  if (e.error) {
-    statusEl.innerHTML = `<span class="pill err">offline</span> <span class="err">${e.error}</span>`;
+  const st = e._status || (e._last_success ? "stale" : "unknown");
+  const hasData = e._last_success || e.host;
+  let line = statusPill(st);
+  if (e._last_success) line += ` <span class="muted">last good update ${e._last_success}</span>`;
+  if (e._last_error) line += ` <span class="err" style="margin-left:12px">${e._last_error}</span>`;
+  statusEl.innerHTML = line;
+
+  if (!hasData) {
     document.getElementById('metrics').innerHTML = "";
+    document.getElementById('specs').innerHTML = "";
+    document.getElementById('disks').innerHTML = '<tr><td colspan="6" class="muted">No data yet</td></tr>';
+    document.getElementById('nics').innerHTML = '<tr><td colspan="3" class="muted">No data yet</td></tr>';
     return;
   }
-  document.getElementById('hostTitle').textContent = `${e.host || IP}`;
-  statusEl.innerHTML = `<span class="pill ok">online</span> <span class="muted">last update ${e.timestamp || ''}</span>`;
+
+  document.getElementById('hostTitle').textContent = e.host || IP;
 
   const m = document.getElementById('metrics');
   m.innerHTML = [
@@ -70,13 +85,12 @@ async function refresh() {
     row('Disk free', e.disk_free),
     row('Disk total', e.disk_total),
     row('Disk %', e.disk_percent_used !== undefined ? `${e.disk_percent_used}%` : null),
-    row('Timestamp', e.timestamp),
+    row('Probe timestamp', e.timestamp),
   ].join("");
 
   const s = e.specs || {};
   const os = s.os || {};
-  const sp = document.getElementById('specs');
-  sp.innerHTML = [
+  document.getElementById('specs').innerHTML = [
     row('CPU model', s.cpu),
     row('GPU', s.gpu),
     row('RAM', fmtBytes(s.ram)),
@@ -84,8 +98,7 @@ async function refresh() {
     row('Platform', os.platform),
   ].join("");
 
-  const dt = document.getElementById('disks');
-  dt.innerHTML = (s.disks || []).map(d => `
+  document.getElementById('disks').innerHTML = (s.disks || []).map(d => `
     <tr>
       <td><code>${d.device}</code></td>
       <td><code>${d.mountpoint}</code></td>
@@ -95,8 +108,7 @@ async function refresh() {
       <td>${d.percent_used}%</td>
     </tr>`).join("") || '<tr><td colspan="6" class="muted">None</td></tr>';
 
-  const nt = document.getElementById('nics');
-  nt.innerHTML = Object.entries(s.connectivity || {}).map(([iface, v]) => `
+  document.getElementById('nics').innerHTML = Object.entries(s.connectivity || {}).map(([iface, v]) => `
     <tr>
       <td><code>${iface}</code></td>
       <td>${(v.addresses || []).join(', ') || '<span class="muted">—</span>'}</td>

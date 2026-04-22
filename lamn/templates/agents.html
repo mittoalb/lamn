@@ -13,7 +13,7 @@
         <th>IP</th>
         <th>Hostname</th>
         <th>Status</th>
-        <th>Last update</th>
+        <th>Last good update</th>
         <th></th>
       </tr>
     </thead>
@@ -22,29 +22,27 @@
 </div>
 <script>
 const AGENTS = {{ agents|tojson }};
+function statusPill(st) {
+  if (st === "online")  return '<span class="pill ok">online</span>';
+  if (st === "stale")   return '<span class="pill warn">stale</span>';
+  if (st === "offline") return '<span class="pill err">offline</span>';
+  return '<span class="pill">unseen</span>';
+}
 async function refresh() {
   const res = await fetch('/metrics');
   const data = await res.json();
   const tbody = document.getElementById('rows');
   let html = "";
   for (const ip of AGENTS) {
-    const e = data[ip];
-    let host = "–", status = '<span class="pill">unseen</span>', ts = "";
-    if (e) {
-      if (e.error) {
-        status = `<span class="pill err">offline</span>`;
-        host = '<span class="muted">' + (e.error.split(':')[0] || 'error') + '</span>';
-      } else {
-        status = `<span class="pill ok">online</span>`;
-        host = (e.host || "").split(".")[0] || "–";
-        ts = e.timestamp || "";
-      }
-    }
-    html += `<tr>
+    const e = data[ip] || {};
+    const st = e._status || (e._last_success ? "stale" : "unknown");
+    const rowCls = st === "stale" ? "stale" : st === "offline" ? "offline" : "";
+    const host = (e.host || "").split(".")[0] || "–";
+    html += `<tr class="${rowCls}">
       <td><a class="row-link" href="/host/${encodeURIComponent(ip)}">${ip}</a></td>
       <td>${host}</td>
-      <td>${status}</td>
-      <td class="muted">${ts}</td>
+      <td>${statusPill(st)}</td>
+      <td class="muted">${e._last_success || ''}</td>
       <td><a class="row-link" href="/host/${encodeURIComponent(ip)}">details &rarr;</a></td>
     </tr>`;
   }

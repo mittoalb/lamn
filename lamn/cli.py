@@ -20,29 +20,30 @@ def display_terminal_metrics(url):
         return
 
     headers = ["Host", "CPU (%)", "Memory (%)", "Disk Used", "Disk Total",
-               "Disk (%)", "GPU (%)", "Timestamp", "Status"]
+               "Disk (%)", "GPU (%)", "Last good", "Status"]
     table = []
 
     for ip, data in metrics.items():
-        if "error" in data:
-            row = [ip, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "",
-                   data.get("error", "Error")]
-        else:
-            host_label = data.get("host", ip)
-            specs = data.get("specs", {})
-            disk_summary = specs.get("disk_summary", {})
-            row = [
-                f"{host_label} ({ip})",
-                data.get("cpu", "N/A"),
-                data.get("memory", "N/A"),
-                disk_summary.get("total_used_human", "N/A"),
-                disk_summary.get("total_space_human", "N/A"),
-                disk_summary.get("percent_used", "N/A"),
-                data.get("gpu", "N/A"),
-                data.get("timestamp", "N/A"),
-                "OK",
-            ]
-        table.append(row)
+        status = data.get("_status") or ("stale" if data.get("_last_success") else "unknown")
+        has_data = data.get("_last_success") or data.get("host")
+        if not has_data:
+            table.append([ip, "–", "–", "–", "–", "–", "–", "",
+                         data.get("_last_error") or status])
+            continue
+        host_label = data.get("host", ip)
+        specs = data.get("specs", {})
+        disk_summary = specs.get("disk_summary", {})
+        table.append([
+            f"{host_label} ({ip})",
+            data.get("cpu", "N/A"),
+            data.get("memory", "N/A"),
+            disk_summary.get("total_used_human", "N/A"),
+            disk_summary.get("total_space_human", "N/A"),
+            disk_summary.get("percent_used", "N/A"),
+            data.get("gpu", "N/A"),
+            data.get("_last_success", "N/A"),
+            status.upper(),
+        ])
 
     try:
         from tabulate import tabulate

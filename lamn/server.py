@@ -92,6 +92,24 @@ def _ssh_argv(ip, settings):
     ]
 
 
+# How many consecutive failed polls before we flip from "stale" to "offline".
+OFFLINE_AFTER = 3
+
+
+def _record_failure(ip, reason):
+    prev = metrics_data.get(ip, {})
+    fails = prev.get("_fail_count", 0) + 1
+    prev["_fail_count"] = fails
+    prev["_last_error"] = reason
+    prev["_last_attempt"] = datetime.now().isoformat()
+    # Status: unknown if we've never seen it; stale if we had data; offline after N fails.
+    if prev.get("_last_success"):
+        prev["_status"] = "offline" if fails >= OFFLINE_AFTER else "stale"
+    else:
+        prev["_status"] = "offline" if fails >= OFFLINE_AFTER else "unknown"
+    metrics_data[ip] = prev
+
+
 def poll_agent(ip, settings, probe_src):
     argv = _ssh_argv(ip, settings)
     try:
@@ -103,29 +121,35 @@ def poll_agent(ip, settings, probe_src):
             timeout=settings["connect_timeout"] + 15,
         )
     except subprocess.TimeoutExpired:
-        metrics_data[ip] = {"error": "SSH poll timed out"}
+        _record_failure(ip, "SSH poll timed out")
         return
     except Exception as e:
-        metrics_data[ip] = {"error": f"SSH failed: {e}"}
+        _record_failure(ip, f"SSH failed: {e}")
         return
 
     if proc.returncode != 0:
         err = (proc.stderr or "").strip().splitlines()[-1:] or ["unknown error"]
-        metrics_data[ip] = {"error": f"probe exit {proc.returncode}: {err[0]}"}
+        _record_failure(ip, f"probe exit {proc.returncode}: {err[0]}")
         return
 
     try:
         data = json.loads(proc.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError) as e:
-        metrics_data[ip] = {"error": f"invalid probe output: {e}"}
+        _record_failure(ip, f"invalid probe output: {e}")
         return
 
+    now = datetime.now().isoformat()
+    data["_status"] = "online"
+    data["_fail_count"] = 0
+    data["_last_error"] = None
+    data["_last_success"] = now
+    data["_last_attempt"] = now
     metrics_data[ip] = data
 
     if ip not in logged_machines:
         specs_logger.info(json.dumps({
             "ip": ip,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now,
             "machine_data": data,
         }, separators=(',', ':')))
         logged_machines.add(ip)
