@@ -31,7 +31,7 @@ function bar(pct) {
 function shortHost(h, ip) { return h ? h.split(".")[0] : ip; }
 function ago(ts) {
   if (!ts) return "";
-  const t = new Date(ts.endsWith("Z") ? ts : ts + "Z");
+  const t = new Date(ts);
   const s = Math.floor((Date.now() - t.getTime()) / 1000);
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s/60)}m ago`;
