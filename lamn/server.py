@@ -5,7 +5,7 @@ import shlex
 import subprocess
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 
 from flask import Flask, abort, jsonify, render_template, request
@@ -101,7 +101,7 @@ def _record_failure(ip, reason):
     fails = prev.get("_fail_count", 0) + 1
     prev["_fail_count"] = fails
     prev["_last_error"] = reason
-    prev["_last_attempt"] = datetime.now().isoformat()
+    prev["_last_attempt"] = datetime.now(timezone.utc).isoformat()
     # Status: unknown if we've never seen it; stale if we had data; offline after N fails.
     if prev.get("_last_success"):
         prev["_status"] = "offline" if fails >= OFFLINE_AFTER else "stale"
@@ -138,7 +138,7 @@ def poll_agent(ip, settings, probe_src):
         _record_failure(ip, f"invalid probe output: {e}")
         return
 
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     data["_status"] = "online"
     data["_fail_count"] = 0
     data["_last_error"] = None
