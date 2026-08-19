@@ -10,15 +10,24 @@ from logging.handlers import RotatingFileHandler
 
 from flask import Flask, abort, jsonify, render_template, request
 
+from lamn.alerts import maybe_disk_alert
 from lamn.config import load_agents, load_settings
 
 PROBE_PATH = os.path.join(os.path.dirname(__file__), "probe.py")
 
 
 # --- logging ---------------------------------------------------------------
+class _DropBadRequestNoise(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        return not ("Bad request" in msg or "Bad HTTP" in msg)
+
+
 def setup_logging():
     os.makedirs('logs', exist_ok=True)
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
+    wz = logging.getLogger('werkzeug')
+    wz.setLevel(logging.ERROR)
+    wz.addFilter(_DropBadRequestNoise())
     logging.getLogger('urllib3').setLevel(logging.ERROR)
 
     specs_logger = logging.getLogger('machine_specs')
@@ -145,6 +154,11 @@ def poll_agent(ip, settings, probe_src):
     data["_last_success"] = now
     data["_last_attempt"] = now
     metrics_data[ip] = data
+
+    try:
+        maybe_disk_alert(ip, data, settings)
+    except Exception as e:
+        logging.getLogger("lamn.alerts").warning("alert dispatch failed for %s: %s", ip, e)
 
     if ip not in logged_machines:
         specs_logger.info(json.dumps({

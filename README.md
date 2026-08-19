@@ -64,6 +64,12 @@ Optional overrides. Any missing key falls back to defaults in [lamn/config.py](l
 | `poll_interval` | Seconds between poll cycles (default 15) |
 | `connect_timeout` | Per-SSH connect timeout (default 3) |
 | `ssh_options` | Extra `ssh -o` flags. Override this only if you need e.g. a `ProxyCommand` — you replace the defaults, so re-list the ones you want to keep |
+| `slack_webhook` | Slack Incoming Webhook URL. If set, disk-usage alerts are posted here |
+| `slack_channel` | Slack channel override (default `#img`) |
+| `slack_username` | Sender name (default `lamn`) |
+| `disk_alert_threshold` | Percent-full threshold to fire an alert (default 90) |
+| `disk_alert_cooldown` | Seconds between repeat alerts for the same `(host, mount)` (default 43200 = 12h) |
+| `disk_alert_hosts` | Optional list of substrings; only hosts whose hostname contains one are alerted (e.g. `["tomodata"]`). Omit to alert on any host |
 
 The config is re-read on every poll cycle. No restart needed after edits.
 
