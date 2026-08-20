@@ -2,4 +2,3 @@ Flask
 psutil
 requests
 py-cpuinfo
-pexpect
