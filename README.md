@@ -70,6 +70,11 @@ Optional overrides. Any missing key falls back to defaults in [lamn/config.py](l
 | `disk_alert_threshold` | Percent-full threshold to fire an alert (default 90) |
 | `disk_alert_cooldown` | Seconds between repeat alerts for the same `(host, mount)` (default 43200 = 12h) |
 | `disk_alert_hosts` | Optional list of substrings; only hosts whose hostname contains one are alerted (e.g. `["tomodata"]`). Omit to alert on any host |
+| `disk_alert_top_n` | Number of biggest entries ("top offenders": path, size, owner) listed in each alert (default 5; `0` disables the scan) |
+| `disk_alert_scan_depth` | How deep under the mountpoint to look for offenders (default 1 = its direct children) |
+| `disk_alert_scan_timeout` | Seconds before the offender `du` scan is cut short; the list is then flagged as partial (default 600) |
+
+When an alert fires, lamn makes one extra SSH call that runs `du -x` on the mountpoint (`offenders.py`), so the scan only happens at most once per cooldown and never on regular polls. It runs as `ssh_user`, so directories that user cannot read are under-counted (the message says so when it happens).
 
 The config is re-read on every poll cycle. No restart needed after edits.
 
